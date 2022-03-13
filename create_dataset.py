@@ -1,12 +1,13 @@
 import pandas as pd
 
 import os
+from random import shuffle
+
+from datasets import load_dataset, DatasetDict
 
 example_filepath = "./dataset/CrisisNLP_labeled_data_crowdflower/2013_Pakistan_eq/2013_Pakistan_eq_CF_labeled_data.tsv"
 directory_of_datasets = "./dataset/CrisisNLP_labeled_data_crowdflower/"
-
-
-
+dataset_complete_filepath = "./dataset/dataset_complete.csv"
 
 
 def clean_individual_dataset(filepath):
@@ -28,8 +29,9 @@ def clean_individual_dataset(filepath):
 
     df = df.drop(columns=['tweet_id'])
 
-    # Rename label column (needed for training model)
+    # Rename columns 
     df.rename(columns={"label": "labels"}, inplace=True)
+    df.rename(columns={"tweet_text": "text"}, inplace=True)
 
     # Convert labels to numbers (needed for model)
     df.replace(to_replace={"labels": labels}, inplace=True) 
@@ -45,19 +47,43 @@ def obtain_filepaths(directory_of_datasets):
 
 
 
-def data_fusion(directory_of_dataset):
+def data_fusion(directory_of_dataset, dataset_complete_filepath):
     dataframes = []
     filepaths = obtain_filepaths(directory_of_dataset)
     for filepath in filepaths:
         dataframes.append(clean_individual_dataset(filepath))
 
     df_total = pd.concat(dataframes)
-    df_total.to_csv('./dataset/dataset_complete.csv', index=False)
+    df_total.to_csv(dataset_complete_filepath, index=False)
+
+
+def run_create_csv(directory_of_datasets, dataset_complete_filepath):
+    data_fusion(directory_of_datasets, dataset_complete_filepath)
+    df = pd.read_csv(dataset_complete_filepath, header=0)
+    print(df)
+    print(df.groupby('labels').count()) #Count of each label
+
+
+def split_dataset(dataset_complete_filepath):
+    data = load_dataset("csv", data_files=dataset_complete_filepath)
+    data = data["train"].train_test_split(train_size=0.8,
+    seed=42)
+
+    data_test_valid = data['test'].train_test_split(train_size=0.5)
+    data['validation'] = data_test_valid.pop('train')
+    data['test'] = data_test_valid.pop('test')
+    return data
 
 
 
-data_fusion(directory_of_datasets)
+def save_dataset_apache_arrow(data):
+    data.save_to_disk("./dataset/")
 
 
-df1 = pd.read_csv("./dataset/dataset_complete.csv", header=0)
-print(df1)
+
+data = split_dataset(dataset_complete_filepath)
+save_dataset_apache_arrow(data)
+
+
+
+#run_create_csv(directory_of_datasets, dataset_complete_filepath)

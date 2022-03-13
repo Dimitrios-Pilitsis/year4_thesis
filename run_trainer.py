@@ -67,11 +67,11 @@ def compute_metrics(eval_pred):
 
 #Fine tuning-----------------------------------------------------
 
-training_args = TrainingArguments("test-trainer", evaluation_strategy="epoch",
+training_args = TrainingArguments("./test-trainer/", evaluation_strategy="epoch",
 report_to = "none")
 
 
-#training_args = TrainingArguments("test-trainer", evaluation_strategy="steps",
+#training_args = TrainingArguments("./test-trainer/", evaluation_strategy="steps",
 #eval_steps=2, report_to="none")
 
 
