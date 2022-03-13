@@ -6,6 +6,11 @@ from transformers import DataCollatorWithPadding
 from datasets import load_metric
 from transformers import TrainingArguments
 from transformers import Trainer
+
+
+import numpy as np
+
+
 # Basic variables --------------------------------------------
 
 
@@ -39,17 +44,20 @@ def tokenize_function(examples):
 tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
 
 
+#Remove columns that aren't strings here
+tokenized_datasets = tokenized_datasets.remove_columns(["idx", "sentence1",
+"sentence2"])
 
 #Collator function for padding
 data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
-
-print(raw_datasets)
+print(tokenized_datasets)
 
 # Metrics -----------------------------------------------------
 
 
-metric = load_metric("accuracy")
+#metric = load_metric("accuracy")
+metric = load_metric("accuracy", "f1")
 
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
@@ -61,6 +69,12 @@ def compute_metrics(eval_pred):
 
 training_args = TrainingArguments("test-trainer", evaluation_strategy="epoch",
 report_to = "none")
+
+
+#training_args = TrainingArguments("test-trainer", evaluation_strategy="steps",
+#eval_steps=2, report_to="none")
+
+
 
 trainer = Trainer(
     model,
