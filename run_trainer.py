@@ -1,9 +1,7 @@
+from datasets import load_from_disk, load_metric
+
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-
-from datasets import load_dataset
-
 from transformers import DataCollatorWithPadding
-from datasets import load_metric
 from transformers import TrainingArguments
 from transformers import Trainer
 
@@ -11,26 +9,37 @@ from transformers import Trainer
 import numpy as np
 
 
+
 # Basic variables --------------------------------------------
 
 
-output_directory = "./saved_model/"
-
-
-
-# Loading dataset ---------------------------------------------
-
-raw_datasets = load_dataset("glue", "mrpc")
+output_directory_save_model = "./saved_model/"
 
 checkpoint = "bert-base-uncased"
 model = AutoModelForSequenceClassification.from_pretrained(checkpoint,
 num_labels=2)
+
+#model = AutoModelForSequenceClassification.from_pretrained(checkpoint,
+#num_labels=9
+
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 
-# Helper functions --------------------------------------------
-def save_model_tokenizer(directory):
-    model.save_pretrained(directory)
-    tokenizer.save_pretrained(directory)
+# Loading dataset ---------------------------------------------
+
+raw_datasets = load_from_disk("./dataset/crisis_dataset")
+
+# NEED TO SHUFFLE DATASET
+
+
+
+def check_dataset(dataset):
+    print(dataset)
+    print(dataset['train'].shuffle(42).select(range(3))['text'])
+
+#check_dataset(raw_datasets)
+
+
+#raw_datasets = load_dataset("glue", "mrpc")
 
 
 
@@ -38,20 +47,33 @@ def save_model_tokenizer(directory):
 # Tokenizers ----------------------------------------------------
 #Is dataset specific
 def tokenize_function(examples):
-    #return tokenizer(examples["text"], truncation=True)
-    return tokenizer(examples["sentence1"], examples["sentence2"], truncation=True)
+    return tokenizer(examples["text"], truncation=True)
+    #return tokenizer(examples["sentence1"], examples["sentence2"], truncation=True)
+
 
 tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
 
 
 #Remove columns that aren't strings here
-tokenized_datasets = tokenized_datasets.remove_columns(["idx", "sentence1",
-"sentence2"])
+#tokenized_datasets = tokenized_datasets.remove_columns(["idx", "sentence1",
+#"sentence2"])
+
+tokenized_datasets = tokenized_datasets.remove_columns(["text"])
+
 
 #Collator function for padding
 data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
-print(tokenized_datasets)
+
+
+def check_tokenized_dataset(tokenizer, tokenized_datasets):
+    print(tokenized_datasets)
+    decoded = tokenizer.decode(tokenized_datasets['train']["input_ids"][0])
+    print(decoded)
+
+
+check_tokenized_dataset(tokenizer, tokenized_datasets)
+
 
 # Metrics -----------------------------------------------------
 
@@ -88,10 +110,20 @@ trainer = Trainer(
 
 trainer.train()
 
+# Prediction ---------------------------------------------------
+
+
+predictions = trainer.predict(tokenized_datasets["test"])
+print(predictions.predictions.shape, predictions.label_ids.shape)
+metric.compute(predictions)
+
+
+
 # Saving model --------------------------------------------------
 
-def save_model(output_directory):
-    model.save_pretrained(output_directory)
-    tokenizer.save_pretrained(output_directory)
+def save_model(output_directory_save_model):
+    model.save_pretrained(output_directory_save_model)
+    tokenizer.save_pretrained(output_directory_save_model)
 
-#save_model(output_directory)
+#save_model(output_directory_save_model)
+
