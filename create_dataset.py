@@ -4,25 +4,28 @@ import os
 
 from datasets import load_dataset
 
+# Important variables ------------------------------------------------------
+#TODO: make variables into arguments passed from calling program
+
 example_filepath = "./dataset/CrisisNLP_labeled_data_crowdflower/2013_Pakistan_eq/2013_Pakistan_eq_CF_labeled_data.tsv"
 directory_of_original_datasets = "./dataset/CrisisNLP_labeled_data_crowdflower/"
 dataset_complete_filepath = "./dataset/dataset_complete.csv"
 
-
+# Functions to clean datasets
 def clean_individual_dataset(filepath):
     df = pd.read_csv(filepath, sep="\t", header=0)
     df.index.name = "Index"
 
     labels = {
-        'injured_or_dead_people' : 1,
-        'missing_trapped_or_found_people' : 2,
-        'displaced_people_and_evacuations' : 3,
-        'infrastructure_and_utilities_damage' : 4,
-        'donation_needs_or_offers_or_volunteering_services' : 5,
-        'caution_and_advice' : 6,
-        'sympathy_and_emotional_support' : 7,
-        'other_useful_information': 8,
-        'not_related_or_irrelevant' : 9,
+        'injured_or_dead_people' : 0,
+        'missing_trapped_or_found_people' : 1,
+        'displaced_people_and_evacuations' : 2,
+        'infrastructure_and_utilities_damage' : 3,
+        'donation_needs_or_offers_or_volunteering_services' : 4,
+        'caution_and_advice' : 5,
+        'sympathy_and_emotional_support' : 6,
+        'other_useful_information': 7,
+        'not_related_or_irrelevant' : 7,
     }
 
 
@@ -64,6 +67,9 @@ def run_create_csv(directory_of_original_datasets, dataset_complete_filepath):
     #print(df.groupby('labels').count()/18967) #percentage of each label
 
 
+
+
+# Split dataset into train:dev:test
 def split_dataset(dataset_complete_filepath):
     data = load_dataset("csv", data_files=dataset_complete_filepath)
     data = data["train"].train_test_split(train_size=0.8,
