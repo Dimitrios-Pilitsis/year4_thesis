@@ -43,7 +43,9 @@ def obtain_filepaths(directory_of_datasets):
                 filepaths.append(os.path.join(subdir, file))
     return filepaths
 
-
+def check_for_duplicate_tweets(df):
+    df.astype({'text': str})
+    print(df[df.duplicated(keep=False, subset=['text'])])
 
 def data_fusion(directory_of_dataset, dataset_complete_filepath):
     dataframes = []
@@ -56,6 +58,9 @@ def data_fusion(directory_of_dataset, dataset_complete_filepath):
     # Rename columns 
     df_total.rename(columns={"label": "labels"}, inplace=True)
     df_total.rename(columns={"tweet_text": "text"}, inplace=True)
+
+    #Check for duplicate tweets
+    check_for_duplicate_tweets(df_total)
     
     df_total.to_csv(dataset_complete_filepath, index=False)
 

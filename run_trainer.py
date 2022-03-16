@@ -62,6 +62,12 @@ tokenized_datasets = tokenized_datasets.remove_columns(["text"])
 data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
 
+def decode_text(tokenizer, text):
+    encoded_input = tokenizer(text)
+    decoded_text = tokenizer.decode(encoded_input["input_ids"])
+    print(decoded_text)
+
+decode_text(tokenizer, "@ElonMusk is #VeryCool")
 
 
 # Tokenizer helper functions ---------------------------------------
