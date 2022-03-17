@@ -1,6 +1,8 @@
-# Dissertation
+# Master's Thesis
 
-This repository contains code, scripts, data and checkpoints for running experiments for my final year dissertation for my Mathematics and Computer Science (MEng) degree.
+This project is a work in progress. 
+
+This repository contains code, data and checkpoints for running the experiments of my Master's Thesis that is a component of my Mathematics and Computer Science (MEng) degree.
 
 
 The project is based on the following paper's model:
