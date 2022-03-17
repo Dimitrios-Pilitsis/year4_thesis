@@ -1,9 +1,12 @@
 import torch
-
-from datasets import load_from_disk, load_metric, DatasetDict
+from torch.utils.data import DataLoader
+from torch.optim import AdamW
 
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from transformers import DataCollatorWithPadding
+from transformers import get_scheduler
+
+from datasets import load_from_disk, load_metric, DatasetDict
 
 from tqdm.auto import tqdm
 
@@ -14,6 +17,8 @@ from tqdm.auto import tqdm
 flag_smaller_datasets = True
 flag_check_dataset = False
 flag_check_tokenized_dataset = False
+
+num_epochs = 3
 
 output_directory_save_model = "./saved_model/"
 
@@ -84,8 +89,6 @@ decode_text(tokenizer, "RT @janinebucks: ♦ http://t.co/sxEjExYuEM 927 ♦ eart
 decode_text(tokenizer, "RT @realsyedasarwat: May ALLAH give them strength who's family/relatives dead in #earthquake my prayers r with them! 😔 ")
 
 
-tokenized_datasets.set_format("torch")
-
 
 # Smaller datasets to speed up training ----------------------------
 def create_smaller_dataset(tokenized_datasets):
@@ -97,17 +100,18 @@ def create_smaller_dataset(tokenized_datasets):
         tokenized_datasets["test"].shuffle(seed=42).select(range(10))
 
     small_datasets = DatasetDict({"train": small_train_dataset, 
-        "validation": small_validation_dataset, "test":small_test_dataset})
+        "validation": small_validation_dataset, "test": small_test_dataset})
     return small_datasets
 
 if flag_smaller_datasets:
     tokenized_datasets = create_smaller_dataset(tokenized_datasets)
 
-print(tokenized_datasets)
+
+tokenized_datasets.set_format("torch")
+
 
 
 # Dataloader --------------------------------------------------
-from torch.utils.data import DataLoader
 
 train_dataloader = DataLoader(tokenized_datasets['train'], shuffle=True, 
     batch_size=8, collate_fn=data_collator)
@@ -120,14 +124,8 @@ test_dataloader = DataLoader(tokenized_datasets['test'], batch_size=8,
 
 # Optimizer and learning rate scheduler -----------------------------
 
-from torch.optim import AdamW
 
 optimizer = AdamW(model.parameters(), lr=5e-5)
-
-from transformers import get_scheduler
-
-
-num_epochs = 3
 
 num_training_steps = num_epochs * len(train_dataloader)
 
@@ -136,34 +134,9 @@ lr_scheduler = get_scheduler(
     num_training_steps=num_training_steps
 )
 
-
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 model.to(device)
-
-
-
-
-
-
-#Training loop -----------------------------------------------------
-
-
-progress_bar = tqdm(range(num_training_steps))
-
-model.train()
-
-for epoch in range(num_epochs):
-    for batch in train_dataloader:
-        batch = {k: v.to(device) for k, v in batch.items()}
-        outputs = model(**batch)
-        loss = outputs.loss
-        loss.backward()
-
-        optimizer.step()
-        lr_scheduler.step()
-        optimizer.zero_grad()
-        progress_bar.update(1)
 
 
 
@@ -182,23 +155,54 @@ def compute_metrics(model, dataloader):
 
         logits = outputs.logits
         predictions = torch.argmax(logits, dim=-1)
-
+        
         accuracy = metric1.compute(predictions=predictions,
             references=batch["labels"])["accuracy"]
         f1_weighted = metric2.compute(predictions=predictions,
             references=batch["labels"], average="weighted")["f1"]
         f1_macro = metric2.compute(predictions=predictions,
             references=batch["labels"], average="macro")["f1"]
-        print({"accuracy": accuracy, "f1_weighted": f1_weighted, "f1_macro":
-        f1_macro})
-                                                     
-
-print("Evaluation")
-compute_metrics(model, eval_dataloader)
+        return {"accuracy": accuracy, "f1_weighted": f1_weighted, "f1_macro":
+        f1_macro}
 
 
-print("Test")
-compute_metrics(model, test_dataloader)
+
+#Training loop -------------------------------------------------------------
+
+
+progress_bar = tqdm(range(num_training_steps))
+
+model.train()
+
+for epoch in range(num_epochs):
+    for batch in train_dataloader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        outputs = model(**batch)
+        loss = outputs.loss
+        loss.backward()
+
+        optimizer.step()
+        lr_scheduler.step()
+        optimizer.zero_grad()
+        progress_bar.update(1)
+
+    train_metrics = compute_metrics(model, train_dataloader)
+    print(f'Epoch {epoch + 1} results')
+    print(train_metrics)
+
+
+
+
+# Evaluation and testing -------------------------
+
+print("Evaluation results")
+eval_metrics = compute_metrics(model, eval_dataloader)
+print(eval_metrics)
+
+
+print("Test results")
+test_metrics = compute_metrics(model, test_dataloader)
+print(test_metrics)
 
 
 
