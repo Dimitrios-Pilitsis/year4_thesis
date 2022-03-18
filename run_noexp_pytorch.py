@@ -1,11 +1,16 @@
+import logging
+import random
+
 import torch
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
 
+import transformers
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from transformers import DataCollatorWithPadding
 from transformers import get_scheduler
 
+import datasets
 from datasets import load_from_disk, load_metric, DatasetDict
 
 from tqdm.auto import tqdm
@@ -13,11 +18,39 @@ from tqdm.auto import tqdm
 from accelerate import Accelerator
 
 
+# Logger ---------------------------------------------------------------
+
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    datefmt="%m/%d/%Y %H:%M:%S",
+    level=logging.INFO,
+)
+
+accelerator = Accelerator()
+
+logger.info(accelerator.state)
+
+
+# Setup logging, we only want one process per machine to log things on the
+# screen.
+# accelerator.is_local_main_process is only True for one process per machine.
+logger.setLevel(logging.INFO if accelerator.is_local_main_process 
+    else logging.ERROR)
+
+if accelerator.is_local_main_process:
+    datasets.utils.logging.set_verbosity_warning()
+    transformers.utils.logging.set_verbosity_info()
+else:
+    datasets.utils.logging.set_verbosity_error()
+    transformers.utils.logging.set_verbosity_error()
+
+
+
 # Important variables and flags --------------------------------------------
 # TODO: turn variables into arguments passed from calling program
 flag_smaller_datasets = True
-flag_check_dataset = False
-flag_check_tokenized_dataset = False
 
 num_epochs = 3
 
@@ -37,26 +70,9 @@ tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 raw_datasets = load_from_disk("./dataset/crisis_dataset")
 
 
-def check_dataset(dataset):
-    print(dataset)
-    print(dataset['train'].shuffle(42).select(range(3))['text'])
-
-if flag_check_dataset:
-    check_dataset(raw_datasets)
-
-
-
-
-# Tokenizer helper functions ---------------------------------------
-def check_tokenized_dataset(tokenizer, tokenized_datasets):
-    print(tokenized_datasets)
-    decoded = tokenizer.decode(tokenized_datasets['train']["input_ids"][0])
-    print(decoded)
-
-if flag_check_tokenized_dataset:
-    check_tokenized_dataset(tokenizer, tokenized_datasets)
-
-
+# Log a few random samples from the training set:
+for index in random.sample(range(len(raw_datasets)), 3):
+    logger.info(f"Data point {index} of the training set sample: {raw_datasets['train'][index]['text']}.")
 
 
 # Tokenizers ----------------------------------------------------
@@ -79,15 +95,12 @@ data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 def decode_text(tokenizer, text):
     encoded_input = tokenizer(text)
     decoded_text = tokenizer.decode(encoded_input["input_ids"])
-    print(decoded_text)
+    return decoded_text
 
 
-
-decode_text(tokenizer, "BREAKING NEWS 400 #Earthquakes in #SanFrancisco.")
-decode_text(tokenizer, "RT @heyyouapp: California USA Rancho Cucamonga http://t.co/TPSViMWZMs BREAKING NEWS 400 Earthquake Powerful Earthquake Slams San Francisco...")
-decode_text(tokenizer, "(♡Alixandro Wilson♡) Renewed Calls for Early-Warning System After Quake: California q... http://t.co/Nx46sLwrDQ (♡Alixandro Wilson♡)")
-decode_text(tokenizer, "RT @janinebucks: ♦ http://t.co/sxEjExYuEM 927 ♦ earthquake ♦ Damage From Northern California Earthquake Could Reach $1 Billio nhttp://t.co/… ")
-decode_text(tokenizer, "RT @realsyedasarwat: May ALLAH give them strength who's family/relatives dead in #earthquake my prayers r with them! 😔 ")
+# Log a few random samples from the tokenized dataset:
+for index in random.sample(range(len(tokenized_datasets)), 3):
+    logger.info(f"Data point {index} of the tokenized training set sample: {decode_text(tokenizer, raw_datasets['train'][index]['text'])}.")
 
 
 
@@ -122,10 +135,8 @@ test_dataloader = DataLoader(tokenized_datasets['test'], batch_size=8,
     collate_fn=data_collator)
 
 
-
 # Optimizer and learning rate scheduler -----------------------------
 
-accelerator = Accelerator()
 
 optimizer = AdamW(model.parameters(), lr=5e-5)
 
@@ -142,10 +153,6 @@ lr_scheduler = get_scheduler(
     num_training_steps=num_training_steps
 )
 
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-
-model.to(device)
-
 
 
 # Metrics -----------------------------------------------------
@@ -153,6 +160,7 @@ model.to(device)
 def compute_metrics(model, dataloader):
     metric1 = load_metric("accuracy")
     metric2 = load_metric("f1")
+    metric3 = load_metric("f1")
 
     model.eval()
 
@@ -163,22 +171,34 @@ def compute_metrics(model, dataloader):
         logits = outputs.logits
         predictions = torch.argmax(logits, dim=-1)
         
-        accuracy = metric1.compute(predictions=predictions,
-            references=batch["labels"])["accuracy"]
-        f1_weighted = metric2.compute(predictions=predictions,
-            references=batch["labels"], average="weighted")["f1"]
-        f1_macro = metric2.compute(predictions=predictions,
-            references=batch["labels"], average="macro")["f1"]
-        return {"accuracy": accuracy, "f1_weighted": f1_weighted, "f1_macro":
-        f1_macro}
+        metric1.add_batch(predictions=accelerator.gather(predictions),
+            references=accelerator.gather(batch['labels']))
+        metric2.add_batch(predictions=accelerator.gather(predictions),
+            references=accelerator.gather(batch['labels']))
+        metric3.add_batch(predictions=accelerator.gather(predictions),
+            references=accelerator.gather(batch['labels']))
+
+
+    accuracy = metric1.compute()["accuracy"]
+    f1_weighted = metric2.compute(average="weighted")["f1"]
+    f1_macro = metric3.compute(average="macro")["f1"]
+
+    results = {"accuracy": accuracy, "f1_weighted": f1_weighted,
+        "f1_macro": f1_macro}
+    return results
+
+        
 
 
 
 #Training loop -------------------------------------------------------------
 
-
-progress_bar = tqdm(range(num_training_steps))
-
+logger.info("***** Running training *****")
+logger.info(f"  Num examples = {tokenized_datasets['train'].num_rows}")
+logger.info(f"  Num Epochs = {num_epochs}")
+logger.info(f"  Num training steps = {num_training_steps}")
+logger.info(f"  Instantaneous batch size per device = {train_dataloader.batch_size}")
+progress_bar = tqdm(range(num_training_steps), disable=not accelerator.is_local_main_process)
 
 for epoch in range(num_epochs):
     model.train()
@@ -193,23 +213,21 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         progress_bar.update(1)
 
-    train_metrics = compute_metrics(model, train_dataloader)
-    print(f'Epoch {epoch + 1} results')
-    print(train_metrics)
-
+    train_metrics = compute_metrics(model, eval_dataloader)
+    #train_metrics = compute_metrics(model, train_dataloader)
+    logger.info(f"Epoch {epoch + 1} results: {train_metrics}")
 
 
 
 # Evaluation and testing -------------------------
-
-print("Evaluation results")
+logger.info("***** Running evaluation set *****")
 eval_metrics = compute_metrics(model, eval_dataloader)
-print(eval_metrics)
+logger.info(f"Evalation results: {eval_metrics}")
 
 
-print("Test results")
+logger.info("***** Running test set *****")
 test_metrics = compute_metrics(model, test_dataloader)
-print(test_metrics)
+logger.info(f"Test results: {test_metrics}")
 
 
 
@@ -221,4 +239,5 @@ def save_model(output_directory_save_model):
     tokenizer.save_pretrained(output_directory_save_model)
 
 #save_model(output_directory_save_model)
+
 
