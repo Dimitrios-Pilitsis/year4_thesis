@@ -10,6 +10,7 @@ from datasets import load_from_disk, load_metric, DatasetDict
 
 from tqdm.auto import tqdm
 
+from accelerate import Accelerator
 
 
 # Important variables and flags --------------------------------------------
@@ -124,13 +125,20 @@ test_dataloader = DataLoader(tokenized_datasets['test'], batch_size=8,
 
 # Optimizer and learning rate scheduler -----------------------------
 
+accelerator = Accelerator()
 
 optimizer = AdamW(model.parameters(), lr=5e-5)
+
+train_dataloader, eval_dataloader, model, optimizer = accelerator.prepare(
+    train_dataloader, eval_dataloader, model, optimizer
+)
 
 num_training_steps = num_epochs * len(train_dataloader)
 
 lr_scheduler = get_scheduler(
-    name="linear", optimizer=optimizer, num_warmup_steps=0,
+    name="linear", 
+    optimizer=optimizer, 
+    num_warmup_steps=0,
     num_training_steps=num_training_steps
 )
 
@@ -149,7 +157,6 @@ def compute_metrics(model, dataloader):
     model.eval()
 
     for batch in dataloader:
-        batch = {k: v.to(device) for k, v in batch.items()}
         with torch.no_grad():
             outputs = model(**batch)
 
@@ -172,14 +179,14 @@ def compute_metrics(model, dataloader):
 
 progress_bar = tqdm(range(num_training_steps))
 
-model.train()
 
 for epoch in range(num_epochs):
+    model.train()
     for batch in train_dataloader:
-        batch = {k: v.to(device) for k, v in batch.items()}
         outputs = model(**batch)
         loss = outputs.loss
-        loss.backward()
+        accelerator.backward(loss)
+
 
         optimizer.step()
         lr_scheduler.step()
