@@ -1,9 +1,13 @@
 import logging
 import random
+import os
+from pathlib import Path
+
 
 import torch
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
+from torch.utils.tensorboard import SummaryWriter
 
 import transformers
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -17,6 +21,24 @@ from tqdm.auto import tqdm
 
 from accelerate import Accelerator
 
+# Summary writer helper functions --------------------------------------------
+def get_summary_writer_log_dir(log_dir) -> str:
+    """Get a unique directory that hasn't been logged to before for use with a TB
+    SummaryWriter.
+    """ 
+    tb_log_dir_prefix = (
+          f"NoExp_"
+          f"run_"
+    )
+    
+    i = 0
+    while i < 1000:
+        #Creates the PosixPath with run iteration appended
+        tb_log_dir = log_dir / (tb_log_dir_prefix + str(i))
+        if not tb_log_dir.exists():
+            return str(tb_log_dir)
+        i += 1
+    return str(tb_log_dir)
 
 # Logger ---------------------------------------------------------------
 
@@ -28,6 +50,9 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
+logs_directory = get_summary_writer_log_dir(Path('logs'))
+
+summary_writer = SummaryWriter(str(logs_directory), flush_secs=5)
 
 accelerator = Accelerator()
 
@@ -221,7 +246,9 @@ for epoch in range(num_epochs):
 
     train_metrics = compute_metrics(model, train_dataloader)
     logger.info(f"Epoch {epoch + 1} results: {train_metrics}")
-
+    summary_writer.add_scalar('accuracy/train', train_metrics['accuracy'], epoch)
+    summary_writer.add_scalar('f1_weighted/train', train_metrics['f1_weighted'], epoch)
+    summary_writer.add_scalar('f1_macro/train', train_metrics['f1_macro'], epoch)
 
 
 
@@ -235,9 +262,12 @@ logger.info(f"Evalation results: {eval_metrics}")
 logger.info("***** Running test set *****")
 test_metrics = compute_metrics(model, test_dataloader)
 logger.info(f"Test results: {test_metrics}")
+summary_writer.add_scalar('accuracy/eval', test_metrics['accuracy'], epoch)
+summary_writer.add_scalar('f1_weighted/eval', test_metrics['f1_weighted'], epoch)
+summary_writer.add_scalar('f1_macro/eval', test_metrics['f1_macro'], epoch)
 
 
-
+summary_writer.close()
 
 # Saving model --------------------------------------------------
 
