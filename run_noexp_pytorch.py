@@ -28,23 +28,29 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
+
 accelerator = Accelerator()
 
 logger.info(accelerator.state)
 
 
-# Setup logging, we only want one process per machine to log things on the
-# screen.
-# accelerator.is_local_main_process is only True for one process per machine.
-logger.setLevel(logging.INFO if accelerator.is_local_main_process 
-    else logging.ERROR)
+full_logger = False
 
-if accelerator.is_local_main_process:
-    datasets.utils.logging.set_verbosity_warning()
-    transformers.utils.logging.set_verbosity_info()
-else:
-    datasets.utils.logging.set_verbosity_error()
-    transformers.utils.logging.set_verbosity_error()
+if full_logger:
+    # Setup logging, we only want one process per machine to log things on the
+    # screen.
+    # accelerator.is_local_main_process is only True for one process per machine.
+
+
+    logger.setLevel(logging.INFO if accelerator.is_local_main_process 
+        else logging.ERROR)
+
+    if accelerator.is_local_main_process:
+        datasets.utils.logging.set_verbosity_warning()
+        transformers.utils.logging.set_verbosity_info() #outputs model config
+    else:
+        datasets.utils.logging.set_verbosity_error()
+        transformers.utils.logging.set_verbosity_error()
 
 
 
@@ -53,6 +59,7 @@ else:
 flag_smaller_datasets = True
 
 num_epochs = 3
+batch_size=8
 
 output_directory_save_model = "./saved_model/"
 
@@ -62,7 +69,6 @@ model = AutoModelForSequenceClassification.from_pretrained(checkpoint,
     num_labels=8)
 
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-
 
 
 # Loading dataset ---------------------------------------------
@@ -128,15 +134,14 @@ tokenized_datasets.set_format("torch")
 # Dataloader --------------------------------------------------
 
 train_dataloader = DataLoader(tokenized_datasets['train'], shuffle=True, 
-    batch_size=8, collate_fn=data_collator)
-eval_dataloader = DataLoader(tokenized_datasets['validation'], batch_size=8, 
-    collate_fn=data_collator)
-test_dataloader = DataLoader(tokenized_datasets['test'], batch_size=8, 
+    batch_size=batch_size, collate_fn=data_collator)
+eval_dataloader = DataLoader(tokenized_datasets['validation'],
+    batch_size=batch_size, collate_fn=data_collator)
+test_dataloader = DataLoader(tokenized_datasets['test'], batch_size=batch_size, 
     collate_fn=data_collator)
 
 
 # Optimizer and learning rate scheduler -----------------------------
-
 
 optimizer = AdamW(model.parameters(), lr=5e-5)
 
@@ -197,7 +202,7 @@ logger.info("***** Running training *****")
 logger.info(f"  Num examples = {tokenized_datasets['train'].num_rows}")
 logger.info(f"  Num Epochs = {num_epochs}")
 logger.info(f"  Num training steps = {num_training_steps}")
-logger.info(f"  Instantaneous batch size per device = {train_dataloader.batch_size}")
+logger.info(f"  Instantaneous batch size per device = {batch_size}")
 progress_bar = tqdm(range(num_training_steps), disable=not accelerator.is_local_main_process)
 
 for epoch in range(num_epochs):
@@ -213,9 +218,11 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         progress_bar.update(1)
 
-    train_metrics = compute_metrics(model, eval_dataloader)
-    #train_metrics = compute_metrics(model, train_dataloader)
+
+    train_metrics = compute_metrics(model, train_dataloader)
     logger.info(f"Epoch {epoch + 1} results: {train_metrics}")
+
+
 
 
 
