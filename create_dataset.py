@@ -12,6 +12,20 @@ directory_of_original_datasets = "./dataset/CrisisNLP_labeled_data_crowdflower/"
 dataset_complete_filepath = "./dataset/dataset_complete.csv"
 
 # Functions to clean datasets
+
+def placeholders(texts):
+    for count, text in enumerate(texts):
+        new_text = []
+        for t in text.split(" "):
+            t = '@user' if t.startswith('@') and len(t) > 1 else t
+            t = 'http' if t.startswith('http') else t
+            t = "" if "RT" in t else t
+            new_text.append(t)
+
+        texts[count] = " ".join(new_text)
+
+    return texts
+
 def clean_individual_dataset(filepath):
     df = pd.read_csv(filepath, sep="\t", header=0)
     df.index.name = "Index"
@@ -28,11 +42,29 @@ def clean_individual_dataset(filepath):
         'not_related_or_irrelevant' : 7,
     }
 
-
     df = df.drop(columns=['tweet_id'])
     # Convert labels to numbers (needed for model)
     df.replace(to_replace={"label": labels}, inplace=True) 
+
+    df = df.astype({'tweet_text': 'string'})
+
+    # Add placeholders and remove unnecessary text
+    df['tweet_text'] = placeholders(df['tweet_text'])
+    
     return df
+
+
+def check_individual_dataset(filepath):
+    df = clean_individual_dataset(filepath)
+    print(df)
+    print((df['tweet_text'][5]))
+    #print(df)
+
+example = "/home/dimipili/Documents/Documents/my_folder/University/Year_4/Thesis/year4_thesis/dataset/CrisisNLP_labeled_data_crowdflower/2013_Pakistan_eq/2013_Pakistan_eq_CF_labeled_data.tsv"
+check_individual_dataset(example)
+exit(0)
+
+
 
 
 def obtain_filepaths(directory_of_datasets):
@@ -44,7 +76,7 @@ def obtain_filepaths(directory_of_datasets):
     return filepaths
 
 def check_for_duplicate_tweets(df):
-    df.astype({'text': str})
+    df.astype({'text': 'string'})
     print(df[df.duplicated(keep=False, subset=['text'])])
 
 def data_fusion(directory_of_dataset, dataset_complete_filepath):
