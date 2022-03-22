@@ -70,7 +70,8 @@ def create_smaller_dataset(tokenized_datasets):
 def compute_metrics(accelerator, model, dataloader):
     metric1 = load_metric("accuracy")
     metric2 = load_metric("f1")
-    metric3 = load_metric("f1")
+    metric3 = load_metric("precision")
+    metric4 = load_metric("recall")
 
     model.eval()
 
@@ -87,14 +88,22 @@ def compute_metrics(accelerator, model, dataloader):
             references=accelerator.gather(batch['labels']))
         metric3.add_batch(predictions=accelerator.gather(predictions),
             references=accelerator.gather(batch['labels']))
+        metric4.add_batch(predictions=accelerator.gather(predictions),
+            references=accelerator.gather(batch['labels']))
 
-
+    #Weighted metrics
     accuracy = metric1.compute()["accuracy"]
     f1_weighted = metric2.compute(average="weighted")["f1"]
-    f1_macro = metric3.compute(average="macro")["f1"]
+    #precision = metric3.compute(average=None) #get per class results
+    precision_weighted = metric3.compute(average="weighted")["precision"]
+    recall_weighted = metric4.compute(average="weighted")["recall"]
 
-    results = {"accuracy": accuracy, "f1_weighted": f1_weighted,
-        "f1_macro": f1_macro}
+    results = {"accuracy": accuracy, 
+                "f1_weighted": f1_weighted,
+                "precision_weighted": precision_weighted,
+                "recall_weighted": recall_weighted
+            }
+
     return results
 
 
@@ -254,16 +263,18 @@ def main():
         logger.info(f"Epoch {epoch + 1} results: {train_metrics}")
         summary_writer.add_scalar('accuracy/train', train_metrics['accuracy'], epoch)
         summary_writer.add_scalar('f1_weighted/train', train_metrics['f1_weighted'], epoch)
-        summary_writer.add_scalar('f1_macro/train', train_metrics['f1_macro'], epoch)
+        summary_writer.add_scalar('precision_weighted/train', train_metrics['recall_weighted'], epoch)
+        summary_writer.add_scalar('recall_weighted/train', train_metrics['recall_weighted'], epoch)
 
 
     # Testing -------------------------
     logger.info("***** Running test set *****")
     test_metrics = compute_metrics(accelerator, model, test_dataloader)
     logger.info(f"Test results: {test_metrics}")
-    summary_writer.add_scalar('accuracy/eval', test_metrics['accuracy'], epoch)
-    summary_writer.add_scalar('f1_weighted/eval', test_metrics['f1_weighted'], epoch)
-    summary_writer.add_scalar('f1_macro/eval', test_metrics['f1_macro'], epoch)
+    summary_writer.add_scalar('accuracy/test', test_metrics['accuracy'], epoch)
+    summary_writer.add_scalar('f1_weighted/test', test_metrics['f1_weighted'], epoch)
+    summary_writer.add_scalar('precision_weighted/test', test_metrics['precision_weighted'], epoch)
+    summary_writer.add_scalar('recall_weighted/test', test_metrics['recall_weighted'], epoch)
 
 
     summary_writer.close()
