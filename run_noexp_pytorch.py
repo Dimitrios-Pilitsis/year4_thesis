@@ -46,8 +46,6 @@ def get_summary_writer_log_dir(log_dir) -> str:
 
 # Tokeinzer functions -------------------------------------------------
 
-
-
 def decode_text(tokenizer, text):
     encoded_input = tokenizer(text)
     decoded_text = tokenizer.decode(encoded_input["input_ids"])
@@ -58,13 +56,10 @@ def decode_text(tokenizer, text):
 def create_smaller_dataset(tokenized_datasets):
     small_train_dataset = \
         tokenized_datasets["train"].shuffle(seed=42).select(range(80))
-    small_validation_dataset = \
-        tokenized_datasets["validation"].shuffle(seed=42).select(range(10))
     small_test_dataset = \
         tokenized_datasets["test"].shuffle(seed=42).select(range(10))
 
-    small_datasets = DatasetDict({"train": small_train_dataset, 
-        "validation": small_validation_dataset, "test": small_test_dataset})
+    small_datasets = DatasetDict({"train": small_train_dataset, "test": small_test_dataset})
     return small_datasets
 
 
@@ -113,7 +108,7 @@ def save_model(output_directory_save_model):
 
 
 
-
+# Main -------------------------------------------------------------------
 
 
 
@@ -173,9 +168,8 @@ def main():
     # Loading dataset ---------------------------------------------
 
     raw_datasets = load_from_disk("./dataset/crisis_dataset")
-
     # Log a few random samples from the training set:
-    for index in random.sample(range(len(raw_datasets)), 3):
+    for index in random.sample(range(len(raw_datasets['train'])), 6):
         logger.info(f"Data point {index} of the training set sample: {raw_datasets['train'][index]['text']}.")
 
 
@@ -195,9 +189,8 @@ def main():
     #Collator function for padding
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
-
     # Log a few random samples from the tokenized dataset:
-    for index in random.sample(range(len(tokenized_datasets)), 3):
+    for index in random.sample(range(len(tokenized_datasets['train'])), 6):
         logger.info(f"Data point {index} of the tokenized training set sample: {decode_text(tokenizer, raw_datasets['train'][index]['text'])}.")
 
     if flag_smaller_datasets:
@@ -212,8 +205,6 @@ def main():
 
     train_dataloader = DataLoader(tokenized_datasets['train'], shuffle=True, 
         batch_size=batch_size, collate_fn=data_collator)
-    eval_dataloader = DataLoader(tokenized_datasets['validation'],
-        batch_size=batch_size, collate_fn=data_collator)
     test_dataloader = DataLoader(tokenized_datasets['test'], batch_size=batch_size, 
         collate_fn=data_collator)
 
@@ -222,8 +213,8 @@ def main():
 
     optimizer = AdamW(model.parameters(), lr=5e-5)
 
-    train_dataloader, eval_dataloader, model, optimizer = accelerator.prepare(
-        train_dataloader, eval_dataloader, model, optimizer
+    train_dataloader, test_dataloader, model, optimizer = accelerator.prepare(
+        train_dataloader, test_dataloader, model, optimizer
     )
 
     num_training_steps = num_epochs * len(train_dataloader)
@@ -266,12 +257,7 @@ def main():
         summary_writer.add_scalar('f1_macro/train', train_metrics['f1_macro'], epoch)
 
 
-    # Evaluation and testing -------------------------
-    logger.info("***** Running evaluation set *****")
-    eval_metrics = compute_metrics(accelerator, model, eval_dataloader)
-    logger.info(f"Evalation results: {eval_metrics}")
-
-
+    # Testing -------------------------
     logger.info("***** Running test set *****")
     test_metrics = compute_metrics(accelerator, model, test_dataloader)
     logger.info(f"Test results: {test_metrics}")

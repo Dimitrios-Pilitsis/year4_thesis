@@ -136,16 +136,11 @@ def run_create_csv(directory_of_original_datasets, dataset_complete_filepath):
 
 
 
-# Split dataset into train:dev:test
+# Split dataset into train:eval
 def split_dataset(dataset_complete_filepath):
     data = load_dataset("csv", data_files=dataset_complete_filepath)
     data = data["train"].train_test_split(train_size=0.8,
         seed=42, shuffle=True)
-
-    data_test_valid = data['test'].train_test_split(train_size=0.5,
-    shuffle=True)
-    data['validation'] = data_test_valid.pop('train')
-    data['test'] = data_test_valid.pop('test')
     return data
 
 
