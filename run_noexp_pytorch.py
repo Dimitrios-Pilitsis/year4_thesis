@@ -3,6 +3,10 @@ import random
 import os
 from pathlib import Path
 
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.metrics import ConfusionMatrixDisplay 
 
 import torch
 from torch.utils.data import DataLoader
@@ -226,6 +230,42 @@ def summary_writer_test(summary_writer, test_metrics, epoch):
                              epoch+1)
 
 
+# Visualizations ---------------------------------------------
+
+def create_confusion_matrix(labels, predictions):
+    ConfusionMatrixDisplay.from_predictions(predictions, labels) 
+
+    plt.savefig('./plots/confusion_matrix.png', bbox_inches='tight')
+    plt.show()
+
+
+def visualizations(accelerator, model, dataloader):
+    labels = []
+    predictions = []
+    model.eval()
+
+    for batch in dataloader:
+        with torch.no_grad():
+            outputs = model(**batch)
+
+        logits = outputs.logits
+        prediction = torch.argmax(logits, dim=-1)
+        prediction = accelerator.gather(prediction).detach().cpu().numpy()
+        label = accelerator.gather(batch['labels']).detach().cpu().numpy()
+        labels.append(label)
+        predictions.append(prediction)
+       
+    
+    labels = np.array(labels).flatten()
+    predictions = np.array(predictions).flatten()
+
+    print(labels)
+    print(predictions)
+    
+    # Individual visualizations
+    create_confusion_matrix(labels, predictions)
+
+
 
 
 # Saving model --------------------------------------------------
@@ -380,12 +420,19 @@ def main():
         logger.info(f"Epoch {epoch + 1} train results: {train_metrics}")
         summary_writer_train(summary_writer, train_metrics, epoch)
 
+        #Visualizations so I don't wait for entire model to train
+        visualizations(accelerator, model, train_dataloader)
+        exit(0)
         # Testing ----------------------------------------------------------------------
         logger.info(f"***** Running test set Epoch {epoch + 1}*****")
         test_metrics = compute_metrics(accelerator, model, test_dataloader)
         logger.info(f"Epoch {epoch + 1} Test results: {test_metrics}")
         
         summary_writer_test(summary_writer, test_metrics, epoch)
+    
+
+    # Plots for final model parameters ------------------------------------------------
+    #visualizations(accelerator, model, test_dataloader)
 
 
     summary_writer.close()
