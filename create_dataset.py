@@ -16,6 +16,16 @@ example_filepath = "./dataset/CrisisNLP_labeled_data_crowdflower/2013_Pakistan_e
 directory_of_original_datasets = "./dataset/CrisisNLP_labeled_data_crowdflower/"
 dataset_complete_filepath = "./dataset/dataset_complete.csv"
 
+explanations_filepath = "./explanations.txt"
+
+# Helper functions for creating explanations -------------------------------
+def see_datapoints(filepath):
+    pd.set_option('display.max_colwidth', None)
+    df = pd.read_csv(filepath, header=0)
+    deaths = df.loc[df['labels'] == 7]['text']
+    print(deaths)
+
+
 # Functions to clean datasets
 
 
@@ -89,8 +99,27 @@ def check_individual_dataset():
     print((df['tweet_text'][1361]))
 
 
+def read_explanations(explanation_file):
+    with open(explanation_file, 'r') as reader:
+        lines = reader.readlines()
+        explanations = [line.strip() for line in lines]
+        return explanations
 
+def create_explanations_dataset(df, explanations):
+    len_df = len(df.index)
+    df = pd.concat([df]*len(explanations), ignore_index=True)
+    ex = explanations * len_df
+    df.insert(1, "explanations", ex, allow_duplicates = True)
+    return df
 
+"""
+fp = "/home/dimipili/Documents/Documents/my_folder/University/Year_4/Thesis/year4_thesis/dataset/CrisisNLP_labeled_data_crowdflower/2013_Pakistan_eq/2013_Pakistan_eq_CF_labeled_data.tsv"
+df = clean_individual_dataset(fp)
+explanations = read_explanations(explanations_filepath)
+df = create_explanations_dataset(df, explanations)
+print(df)
+exit(0)
+"""
 
 def obtain_filepaths(directory_of_datasets):
     filepaths = []
@@ -109,11 +138,13 @@ def check_for_duplicate_tweets(df):
     return df
 
 
-def data_fusion(directory_of_dataset, dataset_complete_filepath):
+def data_fusion(directory_of_dataset, explanations_filepath, dataset_complete_filepath):
     dataframes = []
     filepaths = obtain_filepaths(directory_of_dataset)
     for filepath in filepaths:
-        dataframes.append(clean_individual_dataset(filepath))
+        df = clean_individual_dataset(filepath)
+        #df = create_explanations_dataset(df, explanations)
+        dataframes.append(df)
 
     df_total = pd.concat(dataframes)
 
@@ -123,20 +154,24 @@ def data_fusion(directory_of_dataset, dataset_complete_filepath):
 
     #Check for duplicate tweets
     df_total = check_for_duplicate_tweets(df_total)
+
+
+    explanations = read_explanations(explanations_filepath)
+    df_total = create_explanations_dataset(df_total, explanations)
     
     df_total.to_csv(dataset_complete_filepath, index=False)
 
 
-def run_create_csv(directory_of_original_datasets, dataset_complete_filepath):
-    data_fusion(directory_of_original_datasets, dataset_complete_filepath)
+def run_create_csv(directory_of_original_datasets, explanations_filepath, dataset_complete_filepath):
+    data_fusion(directory_of_original_datasets, explanations_filepath, dataset_complete_filepath)
     df = pd.read_csv(dataset_complete_filepath, header=0)
-    #print(df.groupby('labels').count()) #Count of each label
+    #print(df.groupby('labels').count()) #count of each label
     #print(df.groupby('labels').count()/18967) #percentage of each label
 
 
 
 
-# Split dataset into train:eval
+# Split dataset into train:test
 def split_dataset(dataset_complete_filepath):
     data = load_dataset("csv", data_files=dataset_complete_filepath)
     data = data["train"].train_test_split(train_size=0.8,
@@ -150,9 +185,9 @@ def save_dataset_apache_arrow(data):
 
 
 
-run_create_csv(directory_of_original_datasets, dataset_complete_filepath)
-
+run_create_csv(directory_of_original_datasets, explanations_filepath, dataset_complete_filepath)
 data = split_dataset(dataset_complete_filepath)
+
 
 # Check random points
 #print(data['train'].select(range(3))['text'])
