@@ -14,7 +14,8 @@ import emoji
 
 example_filepath = "./dataset/CrisisNLP_labeled_data_crowdflower/2013_Pakistan_eq/2013_Pakistan_eq_CF_labeled_data.tsv"
 directory_of_original_datasets = "./dataset/CrisisNLP_labeled_data_crowdflower/"
-dataset_complete_filepath = "./dataset/dataset_complete.csv"
+dataset_complete_noexp_filepath = "./dataset/dataset_complete_noexp.csv"
+dataset_complete_exp_filepath = "./dataset/dataset_complete_exp.csv"
 
 explanations_filepath = "./explanations.txt"
 
@@ -72,7 +73,7 @@ def clean_individual_dataset(filepath):
         'caution_and_advice' : 5,
         'sympathy_and_emotional_support' : 6,
         'other_useful_information': 7,
-        'not_related_or_irrelevant' : 7,
+        'not_related_or_irrelevant' : 8,
     }
 
     df = df.drop(columns=['tweet_id'])
@@ -106,10 +107,22 @@ def read_explanations(explanation_file):
         return explanations
 
 def create_explanations_dataset(df, explanations):
+    textual_descriptions = [
+        'injured or dead people',
+        'missing trapped or found people',
+        'displaced people an evacuations',
+        'infrastructure and utilities damage',
+        'donation needs or offers or volunteering services',
+        'caution and advice', 
+        'sympathy and emotional support', 
+        'other_useful_information',
+        'not related or irrelevant',
+    ]
+    ex_td = textual_descriptions + explanations
     len_df = len(df.index)
-    df = pd.concat([df]*len(explanations), ignore_index=True)
-    ex = explanations * len_df
-    df.insert(1, "explanations", ex, allow_duplicates = True)
+    df = pd.concat([df]*len(ex_td), ignore_index=True)
+    ex_td = ex_td * len_df
+    df.insert(1, "explanations and textual descriptions", ex_td, allow_duplicates = True)
     return df
 
 """
@@ -138,12 +151,12 @@ def check_for_duplicate_tweets(df):
     return df
 
 
-def data_fusion(directory_of_dataset, explanations_filepath, dataset_complete_filepath):
+def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
+    ds_exp_fp):
     dataframes = []
     filepaths = obtain_filepaths(directory_of_dataset)
     for filepath in filepaths:
         df = clean_individual_dataset(filepath)
-        #df = create_explanations_dataset(df, explanations)
         dataframes.append(df)
 
     df_total = pd.concat(dataframes)
@@ -153,20 +166,25 @@ def data_fusion(directory_of_dataset, explanations_filepath, dataset_complete_fi
     df_total.rename(columns={"tweet_text": "text"}, inplace=True)
 
     #Check for duplicate tweets
-    df_total = check_for_duplicate_tweets(df_total)
-
+    df_noexp = check_for_duplicate_tweets(df_total)
+    
+    #Get distributions and counts of labels
+    #print(df_total.groupby('labels').count()) #count of each label
+    #print(df_total.groupby('labels').count()/len(df_total.index)) #percentage of each label
 
     explanations = read_explanations(explanations_filepath)
-    df_total = create_explanations_dataset(df_total, explanations)
+    df_exp = create_explanations_dataset(df_total, explanations)
+
+    df_noexp.to_csv(ds_noexp_fp, index=False)
+    df_exp.to_csv(ds_exp_fp, index=False)
+
+
+def run_create_csv(directory_of_original_datasets, explanations_filepath, ds_noexp_fp,
+    ds_exp_fp):
+    data_fusion(directory_of_original_datasets, explanations_filepath,
+        ds_noexp_fp, ds_exp_fp)
+    #df = pd.read_csv(dataset_complete_filepath, header=0)
     
-    df_total.to_csv(dataset_complete_filepath, index=False)
-
-
-def run_create_csv(directory_of_original_datasets, explanations_filepath, dataset_complete_filepath):
-    data_fusion(directory_of_original_datasets, explanations_filepath, dataset_complete_filepath)
-    df = pd.read_csv(dataset_complete_filepath, header=0)
-    #print(df.groupby('labels').count()) #count of each label
-    #print(df.groupby('labels').count()/18967) #percentage of each label
 
 
 
@@ -179,20 +197,20 @@ def split_dataset(dataset_complete_filepath):
     return data
 
 
-def save_dataset_apache_arrow(data):
-    data.save_to_disk("./dataset/crisis_dataset/")
 
 
+run_create_csv(directory_of_original_datasets, explanations_filepath,
+    dataset_complete_noexp_filepath,dataset_complete_exp_filepath)
 
 
-run_create_csv(directory_of_original_datasets, explanations_filepath, dataset_complete_filepath)
-data = split_dataset(dataset_complete_filepath)
-
+data_noexp = split_dataset(dataset_complete_noexp_filepath)
+data_exp = split_dataset(dataset_complete_exp_filepath)
 
 # Check random points
 #print(data['train'].select(range(3))['text'])
 
-save_dataset_apache_arrow(data)
+data_noexp.save_to_disk("./dataset/crisis_dataset/noexp/")
+data_exp.save_to_disk("./dataset/crisis_dataset/exp/")
 
 
 
