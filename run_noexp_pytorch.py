@@ -28,14 +28,21 @@ from accelerate import Accelerator
 
 
 # Summary writer helper functions --------------------------------------------
-def get_summary_writer_log_dir(log_dir) -> str:
+def get_summary_writer_log_dir(log_dir, exp_flag):
     """Get a unique directory that hasn't been logged to before for use with a TB
     SummaryWriter.
     """ 
-    tb_log_dir_prefix = (
+    
+    if exp_flag:
+        tb_log_dir_prefix = (
+          f"Exp_"
+          f"run_"
+        )
+    else:
+        tb_log_dir_prefix = (
           f"NoExp_"
           f"run_"
-    )
+        )
     
     i = 0
     while i < 1000:
@@ -50,10 +57,16 @@ def get_summary_writer_log_dir(log_dir) -> str:
 
 # Tokeinzer functions -------------------------------------------------
 
-def decode_text(tokenizer, text):
+def decode_text_noexp(tokenizer, text):
     encoded_input = tokenizer(text)
     decoded_text = tokenizer.decode(encoded_input["input_ids"])
     return decoded_text
+
+def decode_text_exp(tokenizer, text, explanation):
+    encoded_input = tokenizer(text, explanation)
+    decoded_text = tokenizer.decode(encoded_input["input_ids"])
+    return decoded_text
+
 
 
 # Smaller datasets to speed up training ----------------------------
@@ -261,9 +274,10 @@ def visualizations(accelerator, model, dataloader):
         labels.append(label)
         predictions.append(prediction)
        
-    
-    labels = np.array(labels).flatten()
-    predictions = np.array(predictions).flatten()
+    #Flattens array even when subarrays aren't of equal dimension (due to batch
+    # size)
+    labels = np.hstack(np.array(labels, dtype=object))
+    predictions = np.hstack(np.array(predictions, dtype=object))
 
     print(labels)
     print(predictions)
@@ -286,6 +300,9 @@ def save_model(output_directory_save_model):
 
 
 def main():
+
+    exp_flag = True
+
     # Logger and summary writer --------------------------------------------
     logger = logging.getLogger(__name__)
     logging.basicConfig(
@@ -294,7 +311,7 @@ def main():
         level=logging.INFO,
     )
 
-    logs_directory = get_summary_writer_log_dir(Path('logs'))
+    logs_directory = get_summary_writer_log_dir(Path('logs'), exp_flag)
 
     summary_writer = SummaryWriter(str(logs_directory), flush_secs=5)
 
@@ -339,45 +356,65 @@ def main():
 
 
     # Loading dataset ---------------------------------------------
-
-    raw_datasets = load_from_disk("./dataset/crisis_dataset/noexp/")
+    if exp_flag:
+        raw_datasets = load_from_disk("./dataset/crisis_dataset/exp/")
+    else:
+        raw_datasets = load_from_disk("./dataset/crisis_dataset/noexp/")
 
     # Log a few random samples from the training set:
     for index in random.sample(range(len(raw_datasets['train'])), 6):
-        logger.info(f"Data point {index} of the training set sample: {raw_datasets['train'][index]['text']}.")
-        logger.info(f"Data point {index} of the training set sample: {raw_datasets['train'][index]['labels']}.")
+        logger.info(f"Text of data point {index} of the training set sample: {raw_datasets['train'][index]['text']}.")
+        logger.info(f"Explanation of data point {index} of the training set "
+                    f"example: {raw_datasets['train'][index]['exp_and_td']}.") if exp_flag else None
+        logger.info(f"Label of data point {index} of the training set sample: {raw_datasets['train'][index]['labels']}.")
 
 
     # Tokenizers ----------------------------------------------------
     #Is dataset specific
-    def tokenize_function(examples):
+    def tokenize_noexp_function(examples):
         return tokenizer(examples["text"], truncation=True)
 
 
-    def tokenize_function_with_explanation(examples):
-        return tokenizer(examples['text'], examples['explanation'],
+    def tokenize_exp_function(examples):
+        return tokenizer(examples['text'], examples['exp_and_td'],
             truncation=True)
 
-
-    tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
+    if exp_flag:
+        tokenized_datasets = raw_datasets.map(tokenize_exp_function, batched=True)
+        tokenized_datasets = tokenized_datasets.remove_columns(["exp_and_td"])
+    else:
+        tokenized_datasets = raw_datasets.map(tokenize_noexp_function, batched=True)
 
 
     #Remove columns that aren't strings here
     tokenized_datasets = tokenized_datasets.remove_columns(["text"])
-
+    print(tokenized_datasets)
 
     #Collator function for padding
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     # Log a few random samples from the tokenized dataset:
     for index in random.sample(range(len(tokenized_datasets['train'])), 6):
-        logger.info(f"Data point {index} of the tokenized training set sample: {decode_text(tokenizer, raw_datasets['train'][index]['text'])}.")
+        if exp_flag:
+            logger.info(f"Data point {index} of the tokenized training set sample: "
+            f"{decode_text_exp(tokenizer, raw_datasets['train'][index]['text'], raw_datasets['train'][index]['exp_and_td'])}.")
+        else:
+            logger.info(f"Data point {index} of the tokenized training set sample: "
+            f"{decode_text_noexp(tokenizer, raw_datasets['train'][index]['text'])}.")
+
+
+        logger.info(f"Input IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['input_ids']}.")
+        logger.info(f"Token type IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['token_type_ids']}.")
+
+    exit(0)
 
     if flag_smaller_datasets:
         tokenized_datasets = create_smaller_dataset(tokenized_datasets)
 
-
     tokenized_datasets.set_format("torch")
+
+    print(tokenized_datasets)
+    exit(0)
 
 
     # Dataloader --------------------------------------------------
@@ -434,8 +471,8 @@ def main():
         summary_writer_train(summary_writer, train_metrics, epoch)
 
         #Visualizations so I don't wait for entire model to train
-        visualizations(accelerator, model, train_dataloader)
-        exit(0)
+        #visualizations(accelerator, model, train_dataloader)
+        #exit(0)
         # Testing ----------------------------------------------------------------------
         logger.info(f"***** Running test set Epoch {epoch + 1}*****")
         test_metrics = compute_metrics(accelerator, model, test_dataloader)
