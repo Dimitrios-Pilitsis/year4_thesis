@@ -55,7 +55,7 @@ def get_summary_writer_log_dir(log_dir, exp_flag):
 
 
 
-# Tokeinzer functions -------------------------------------------------
+# Tokenizer functions -------------------------------------------------
 
 def decode_text_noexp(tokenizer, text):
     encoded_input = tokenizer(text)
@@ -252,7 +252,8 @@ def summary_writer_test(summary_writer, test_metrics, epoch):
 # Visualizations ---------------------------------------------
 
 def create_confusion_matrix(labels, predictions):
-    ConfusionMatrixDisplay.from_predictions(predictions, labels) 
+    ConfusionMatrixDisplay.from_predictions(predictions, labels,
+        labels=list(range(0,9)))
 
     plt.savefig('./plots/confusion_matrix.png', bbox_inches='tight')
     plt.show()
@@ -284,15 +285,6 @@ def visualizations(accelerator, model, dataloader):
     
     # Individual visualizations
     create_confusion_matrix(labels, predictions)
-
-
-
-
-# Saving model --------------------------------------------------
-
-def save_model(output_directory_save_model):
-    model.save_pretrained(output_directory_save_model)
-    tokenizer.save_pretrained(output_directory_save_model)
 
 
 
@@ -362,7 +354,7 @@ def main():
         raw_datasets = load_from_disk("./dataset/crisis_dataset/noexp/")
 
     # Log a few random samples from the training set:
-    for index in random.sample(range(len(raw_datasets['train'])), 6):
+    for index in random.sample(range(len(raw_datasets['train'])), 4):
         logger.info(f"Text of data point {index} of the training set sample: {raw_datasets['train'][index]['text']}.")
         logger.info(f"Explanation of data point {index} of the training set "
                     f"example: {raw_datasets['train'][index]['exp_and_td']}.") if exp_flag else None
@@ -394,7 +386,7 @@ def main():
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     # Log a few random samples from the tokenized dataset:
-    for index in random.sample(range(len(tokenized_datasets['train'])), 6):
+    for index in random.sample(range(len(tokenized_datasets['train'])), 4):
         if exp_flag:
             logger.info(f"Data point {index} of the tokenized training set sample: "
             f"{decode_text_exp(tokenizer, raw_datasets['train'][index]['text'], raw_datasets['train'][index]['exp_and_td'])}.")
@@ -406,15 +398,12 @@ def main():
         logger.info(f"Input IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['input_ids']}.")
         logger.info(f"Token type IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['token_type_ids']}.")
 
-    exit(0)
 
     if flag_smaller_datasets:
         tokenized_datasets = create_smaller_dataset(tokenized_datasets)
 
     tokenized_datasets.set_format("torch")
 
-    print(tokenized_datasets)
-    exit(0)
 
 
     # Dataloader --------------------------------------------------
@@ -482,12 +471,16 @@ def main():
     
 
     # Plots for final model parameters ------------------------------------------------
-    #visualizations(accelerator, model, test_dataloader)
+    visualizations(accelerator, model, test_dataloader)
 
 
     summary_writer.close()
+    
 
-    #save_model(output_directory_save_model)
+    # Save model and tokenizer----------------------------------------------
+    #model.save_pretrained(output_directory_save_model)
+    #tokenizer.save_pretrained(output_directory_save_model)
+
 
 
 if __name__ == "__main__":
