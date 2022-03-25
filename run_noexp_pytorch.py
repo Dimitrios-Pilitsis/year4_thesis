@@ -110,7 +110,7 @@ def compute_metrics(accelerator, model, dataloader):
 
 
     #Per class metrics
-    labels = list(range(0,8))
+    labels = list(range(0,9))
     f1 = metric2.compute(average=None, labels=labels)["f1"]
     precision = metric3.compute(average=None, labels=labels)["precision"]
     recall = metric4.compute(average=None, labels=labels)["recall"]
@@ -156,7 +156,8 @@ def summary_writer_train(summary_writer, train_metrics, epoch):
                               "f1_class_4/train" : train_metrics["f1"][4],
                               "f1_class_5/train" : train_metrics["f1"][5],
                               "f1_class_6/train" : train_metrics["f1"][6],
-                              "f1_class_7/train" : train_metrics["f1"][7]},
+                              "f1_class_7/train" : train_metrics["f1"][7],
+                              "f1_class_8/train" : train_metrics["f1"][8]},
                               epoch+1)
 
 
@@ -168,7 +169,8 @@ def summary_writer_train(summary_writer, train_metrics, epoch):
                         "precision_class_4/train" : train_metrics["precision"][4],
                         "precision_class_5/train" : train_metrics["precision"][5],
                         "precision_class_6/train" : train_metrics["precision"][6],
-                        "precision_class_7/train" : train_metrics["precision"][7]},
+                        "precision_class_7/train" : train_metrics["precision"][7],
+                        "precision_class_8/train" : train_metrics["precision"][8]},
                         epoch+1)
     
 
@@ -180,7 +182,8 @@ def summary_writer_train(summary_writer, train_metrics, epoch):
                                  "recall_class_4/train" : train_metrics["recall"][4],
                                  "recall_class_5/train" : train_metrics["recall"][5],
                                  "recall_class_6/train" : train_metrics["recall"][6],
-                                 "recall_class_7/train" : train_metrics["recall"][7]},
+                                 "recall_class_7/train" : train_metrics["recall"][7],
+                                 "recall_class_8/train" : train_metrics["recall"][8]},
                                  epoch+1)
 
 
@@ -202,7 +205,8 @@ def summary_writer_test(summary_writer, test_metrics, epoch):
                               "f1_class_4/test" : test_metrics["f1"][4],
                               "f1_class_5/test" : test_metrics["f1"][5],
                               "f1_class_6/test" : test_metrics["f1"][6],
-                              "f1_class_7/test" : test_metrics["f1"][7]},
+                              "f1_class_7/test" : test_metrics["f1"][7],
+                              "f1_class_8/test" : test_metrics["f1"][8]},
                               epoch+1)
 
 
@@ -214,7 +218,8 @@ def summary_writer_test(summary_writer, test_metrics, epoch):
                         "precision_class_4/test" : test_metrics["precision"][4],
                         "precision_class_5/test" : test_metrics["precision"][5],
                         "precision_class_6/test" : test_metrics["precision"][6],
-                        "precision_class_7/test" : test_metrics["precision"][7]},
+                        "precision_class_7/test" : test_metrics["precision"][7],
+                        "precision_class_8/test" : test_metrics["precision"][8]},
                         epoch+1)
    
 
@@ -226,7 +231,8 @@ def summary_writer_test(summary_writer, test_metrics, epoch):
                              "recall_class_4/test" : test_metrics["recall"][4],
                              "recall_class_5/test" : test_metrics["recall"][5],
                              "recall_class_6/test" : test_metrics["recall"][6],
-                             "recall_class_7/test" : test_metrics["recall"][7]},
+                             "recall_class_7/test" : test_metrics["recall"][7],
+                             "recall_class_8/test" : test_metrics["recall"][8]},
                              epoch+1)
 
 
@@ -327,23 +333,30 @@ def main():
     checkpoint = "bert-base-cased"
 
     model = AutoModelForSequenceClassification.from_pretrained(checkpoint,
-        num_labels=8)
+        num_labels=9)
 
     tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 
 
     # Loading dataset ---------------------------------------------
 
-    raw_datasets = load_from_disk("./dataset/crisis_dataset")
+    raw_datasets = load_from_disk("./dataset/crisis_dataset/noexp/")
+
     # Log a few random samples from the training set:
     for index in random.sample(range(len(raw_datasets['train'])), 6):
         logger.info(f"Data point {index} of the training set sample: {raw_datasets['train'][index]['text']}.")
+        logger.info(f"Data point {index} of the training set sample: {raw_datasets['train'][index]['labels']}.")
 
 
     # Tokenizers ----------------------------------------------------
     #Is dataset specific
     def tokenize_function(examples):
         return tokenizer(examples["text"], truncation=True)
+
+
+    def tokenize_function_with_explanation(examples):
+        return tokenizer(examples['text'], examples['explanation'],
+            truncation=True)
 
 
     tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
