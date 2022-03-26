@@ -28,7 +28,7 @@ from accelerate import Accelerator
 
 
 # Summary writer helper functions --------------------------------------------
-def get_summary_writer_log_dir(log_dir, exp_flag):
+def get_dir_numbered(log_dir, exp_flag):
     """Get a unique directory that hasn't been logged to before for use with a TB
     SummaryWriter.
     """ 
@@ -47,7 +47,22 @@ def get_summary_writer_log_dir(log_dir, exp_flag):
         i += 1
     return str(tb_log_dir)
 
+def get_saved_model_dir(saved_model_dir, exp_flag):
+    if exp_flag:
+        saved_model_prefix = (f"Exp_run_")
+    else:
+        saved_model_prefix = (f"NoExp_run_")
 
+    i=0
+    while i < 1000:
+        #Creates the PosixPath with run iteration appended
+        tb_log_dir = log_dir / (tb_log_dir_prefix + str(i))
+        if not tb_log_dir.exists():
+            return str(tb_log_dir)
+        i += 1
+    return str(tb_log_dir)
+
+    model_saved_directory = "./saved_model/" + current_run.replace(current_run[-1], str(current_run_number-1))
 
 # Tokenizer functions -------------------------------------------------
 
@@ -198,15 +213,16 @@ def summary_writer_test(summary_writer, test_metrics, epoch):
 
 # Visualizations ---------------------------------------------
 
-def create_confusion_matrix(labels, predictions):
+def create_confusion_matrix(labels, predictions, current_run):
     ConfusionMatrixDisplay.from_predictions(predictions, labels,
         labels=list(range(0,9)))
-
-    plt.savefig('./plots/confusion_matrix.png', bbox_inches='tight')
+    
+    filepath = "./plots/" + current_run + "_confusion_matrix.png"
+    plt.savefig(filepath, bbox_inches='tight')
     plt.show()
 
 
-def visualizations(accelerator, model, dataloader):
+def visualizations(accelerator, model, dataloader, current_run):
     labels = []
     predictions = []
     model.eval()
@@ -231,7 +247,7 @@ def visualizations(accelerator, model, dataloader):
     print(predictions)
     
     # Individual visualizations
-    create_confusion_matrix(labels, predictions)
+    create_confusion_matrix(labels, predictions, current_run)
 
 
 
@@ -250,8 +266,9 @@ def main():
         level=logging.INFO,
     )
 
-    logs_directory = get_summary_writer_log_dir(Path('logs'), exp_flag)
-    current_run_number = logs_directory.split("/")[-1]
+    logs_directory = get_dir_numbered(Path('logs'), exp_flag)
+    current_run = logs_directory.split("/")[-1]
+    current_run_number = int(current_run.split("_")[-1])
 
     summary_writer = SummaryWriter(str(logs_directory), flush_secs=5)
 
@@ -281,18 +298,37 @@ def main():
     # Important variables and flags --------------------------------------------
     # TODO: turn variables into arguments passed from calling program
     flag_smaller_datasets = True
+    use_saved_model = False
 
     num_epochs = 3
     batch_size=8
+    
+    #Use latest model that was saved
+    #Need to shift run number by -1 as latest model that has been trained is
+    #current run - 1
+    output_directory_save_model = get_dir_numbered(Path('saved_model'), exp_flag)
 
-    output_directory_save_model = "./saved_model/" + current_run_number
+    model_saved_run_number = int(output_directory_save_model.split("_")[-1])-1
+    model_saved_directory = \
+        output_directory_save_model.replace(output_directory_save_model.split("_")[-1], \
+        str(model_saved_run_number))
 
-    checkpoint = "bert-base-cased"
+    #Do not allow model to be loaded if saved model is empty
+    if not os.listdir(model_saved_directory.split("/")[0]):
+        use_saved_model = False
 
-    model = AutoModelForSequenceClassification.from_pretrained(checkpoint,
-        num_labels=9)
+    #Model is set to evaluation mode by default using model.eval()
+    #Using checkpoint is much quicker as model and tokenizer are cached by Huggingface
+    if use_saved_model:
+        model = AutoModelForSequenceClassification.from_pretrained(model_saved_directory,
+            num_labels=9)
+        tokenizer = AutoTokenizer.from_pretrained(model_saved_directory)
+    else:
+        checkpoint = "bert-base-cased"
+        model = AutoModelForSequenceClassification.from_pretrained(checkpoint,
+            num_labels=9)
+        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 
-    tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 
 
     # Loading dataset ---------------------------------------------
@@ -408,7 +444,7 @@ def main():
         summary_writer_train(summary_writer, train_metrics, epoch)
 
         #Visualizations so I don't wait for entire model to train
-        #visualizations(accelerator, model, train_dataloader)
+        #visualizations(accelerator, model, train_dataloader, current_run)
         #exit(0)
         # Testing ----------------------------------------------------------------------
         logger.info(f"***** Running test set Epoch {epoch + 1}*****")
@@ -419,15 +455,17 @@ def main():
     
 
     # Plots for final model parameters ------------------------------------------------
-    visualizations(accelerator, model, test_dataloader)
+    visualizations(accelerator, model, test_dataloader, current_run)
 
 
     summary_writer.close()
     
 
-    # Save model and tokenizer----------------------------------------------
-    model.save_pretrained(output_directory_save_model)
-    tokenizer.save_pretrained(output_directory_save_model)
+    # Save model and tokenizer---------------------------------------------
+    save_model_tokenizer = False
+    if save_model_tokenizer:
+        model.save_pretrained(output_directory_save_model)
+        tokenizer.save_pretrained(output_directory_save_model)
 
 
 if __name__ == "__main__":
