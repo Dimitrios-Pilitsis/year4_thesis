@@ -9,6 +9,8 @@ from datasets import load_dataset
 import demoji
 import emoji
 
+import seaborn as sns
+
 # Important variables ------------------------------------------------------
 #TODO: make variables into arguments passed from calling program
 
@@ -19,6 +21,8 @@ dataset_complete_exp_filepath = "./dataset/dataset_complete_exp.csv"
 
 explanations_filepath = "./explanations.txt"
 
+
+
 # Helper functions for inspecting data -------------------------------
 def see_datapoints(filepath, label):
     pd.set_option('display.max_colwidth', None)
@@ -27,9 +31,13 @@ def see_datapoints(filepath, label):
     deaths = df.loc[df['labels'] == label]['text']
     print(deaths)
 
+
+
 def inspect_labels(df):
-    print(df_total.groupby('labels').count()) #count of each label
-    print(df_total.groupby('labels').count()/len(df_total.index)) #percentage of each label
+    print(df.groupby('labels').count()) #count of each label
+    print(df.groupby('labels').count()/len(df.index)) #percentage of each label
+
+
 
 # Functions to clean datasets
 def camel_case_split(word):
@@ -38,6 +46,8 @@ def camel_case_split(word):
     list_words = [word[x: y] for x, y in zip(start_idx, start_idx[1:])][1:] 
     return ' '.join(list_words)
 
+
+
 #Deals with cases where there are consecutive emojis or no space between text
 #and emoji
 def emoji_present(text):
@@ -45,6 +55,8 @@ def emoji_present(text):
         return demoji.replace_with_desc(text, sep="")
     else:
         return text
+
+
 
 def placeholders(texts):
     for count, text in enumerate(texts):
@@ -60,6 +72,7 @@ def placeholders(texts):
         texts[count] = " ".join(new_text).strip()
 
     return texts
+
 
 
 def clean_individual_dataset(filepath):
@@ -182,8 +195,37 @@ def split_dataset(dataset_complete_filepath):
         seed=42, shuffle=True)
     return data
 
+def label_count_plot(filepath, exp_flag):
+    data = pd.read_csv(filepath, header=0)
+    count_plot = sns.countplot(data['labels'])
+    fig = count_plot.get_figure()
+    if exp_flag:
+        filepath = "./plots/Exp_label_count.png"
+    else:
+        filepath = "./plots/NoExp_label_count.png"
+
+    fig.savefig(filepath, bbox_inches='tight')
+
+
+def label_distribution_plot(filepath):
+    df = pd.read_csv(filepath, header=0)
+    counts = df.groupby('labels').count()/len(df.index) #percentage of each label
+    data = (counts['text']*100)
+    bar_plot = sns.barplot(list(range(len(data))), data)
+    bar_plot.set_xlabel("Label")
+    bar_plot.set_ylabel("Percentage")
+    fig = bar_plot.get_figure()
+    fig.savefig("./plots/label_distribution.png", bbox_inches='tight')
 
 def main():
+    label_distribution_plot(dataset_complete_noexp_filepath)
+    exit(0)
+
+
+    label_count_plot(dataset_complete_exp_filepath, True)
+    label_count_plot(dataset_complete_noexp_filepath, False)
+
+    exit(0)
     run_create_csv(directory_of_original_datasets, explanations_filepath,
         dataset_complete_noexp_filepath,dataset_complete_exp_filepath)
 
