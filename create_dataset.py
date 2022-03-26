@@ -19,17 +19,19 @@ dataset_complete_exp_filepath = "./dataset/dataset_complete_exp.csv"
 
 explanations_filepath = "./explanations.txt"
 
-# Helper functions for creating explanations -------------------------------
-def see_datapoints(filepath):
+# Helper functions for inspecting data -------------------------------
+def see_datapoints(filepath, label):
     pd.set_option('display.max_colwidth', None)
     df = pd.read_csv(filepath, header=0)
-    deaths = df.loc[df['labels'] == 7]['text']
+    print(df)
+    deaths = df.loc[df['labels'] == label]['text']
     print(deaths)
 
+def inspect_labels(df):
+    print(df_total.groupby('labels').count()) #count of each label
+    print(df_total.groupby('labels').count()/len(df_total.index)) #percentage of each label
 
 # Functions to clean datasets
-
-
 def camel_case_split(word):
     start_idx = [i for i, e in enumerate(word) if e.isupper()] + [len(word)]
     start_idx = [0] + start_idx
@@ -88,17 +90,12 @@ def clean_individual_dataset(filepath):
     #Remove empty tweets
     df['tweet_text'].replace('', np.nan, inplace=True) 
     df.dropna(subset=['tweet_text'], inplace=True)
-
     
     return df
 
 
-def check_individual_dataset():
-    file_path = "/home/dimipili/Documents/Documents/my_folder/University/Year_4/Thesis/year4_thesis/dataset/CrisisNLP_labeled_data_crowdflower/2013_Pakistan_eq/2013_Pakistan_eq_CF_labeled_data.tsv"
-    df = clean_individual_dataset(filepath)
-    print(df)
-    print((df['tweet_text'][1361]))
 
+# Explanation functions --------------------------------
 
 def read_explanations(explanation_file):
     with open(explanation_file, 'r') as reader:
@@ -122,18 +119,12 @@ def create_explanations_dataset(df, explanations):
     len_df = len(df.index)
     df = pd.concat([df]*len(ex_td), ignore_index=True)
     ex_td = ex_td * len_df
-    df.insert(1, "explanations and textual descriptions", ex_td, allow_duplicates = True)
+    df.insert(1, "exp_and_td", ex_td, allow_duplicates = True)
     return df
 
-"""
-fp = "/home/dimipili/Documents/Documents/my_folder/University/Year_4/Thesis/year4_thesis/dataset/CrisisNLP_labeled_data_crowdflower/2013_Pakistan_eq/2013_Pakistan_eq_CF_labeled_data.tsv"
-df = clean_individual_dataset(fp)
-explanations = read_explanations(explanations_filepath)
-df = create_explanations_dataset(df, explanations)
-print(df)
-exit(0)
-"""
 
+
+# Clean dataset functions -------------------------------------
 def obtain_filepaths(directory_of_datasets):
     filepaths = []
     for subdir, dirs, files in os.walk(directory_of_datasets):
@@ -169,8 +160,7 @@ def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
     df_noexp = check_for_duplicate_tweets(df_total)
     
     #Get distributions and counts of labels
-    #print(df_total.groupby('labels').count()) #count of each label
-    #print(df_total.groupby('labels').count()/len(df_total.index)) #percentage of each label
+    #inspect_labels(df_total)
 
     explanations = read_explanations(explanations_filepath)
     df_exp = create_explanations_dataset(df_total, explanations)
@@ -183,11 +173,7 @@ def run_create_csv(directory_of_original_datasets, explanations_filepath, ds_noe
     ds_exp_fp):
     data_fusion(directory_of_original_datasets, explanations_filepath,
         ds_noexp_fp, ds_exp_fp)
-    #df = pd.read_csv(dataset_complete_filepath, header=0)
     
-
-
-
 
 # Split dataset into train:test
 def split_dataset(dataset_complete_filepath):
@@ -197,20 +183,20 @@ def split_dataset(dataset_complete_filepath):
     return data
 
 
+def main():
+    run_create_csv(directory_of_original_datasets, explanations_filepath,
+        dataset_complete_noexp_filepath,dataset_complete_exp_filepath)
 
 
-run_create_csv(directory_of_original_datasets, explanations_filepath,
-    dataset_complete_noexp_filepath,dataset_complete_exp_filepath)
+    data_noexp = split_dataset(dataset_complete_noexp_filepath)
+    data_exp = split_dataset(dataset_complete_exp_filepath)
+
+    # Check random points
+    #print(data['train'].select(range(3))['text'])
+
+    data_noexp.save_to_disk("./dataset/crisis_dataset/noexp/")
+    data_exp.save_to_disk("./dataset/crisis_dataset/exp/")
 
 
-data_noexp = split_dataset(dataset_complete_noexp_filepath)
-data_exp = split_dataset(dataset_complete_exp_filepath)
-
-# Check random points
-#print(data['train'].select(range(3))['text'])
-
-data_noexp.save_to_disk("./dataset/crisis_dataset/noexp/")
-data_exp.save_to_disk("./dataset/crisis_dataset/exp/")
-
-
-
+if __name__ == "__main__":
+    main()

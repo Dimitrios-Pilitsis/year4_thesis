@@ -34,16 +34,10 @@ def get_summary_writer_log_dir(log_dir, exp_flag):
     """ 
     
     if exp_flag:
-        tb_log_dir_prefix = (
-          f"Exp_"
-          f"run_"
-        )
+        tb_log_dir_prefix = (f"Exp_run_")
     else:
-        tb_log_dir_prefix = (
-          f"NoExp_"
-          f"run_"
-        )
-    
+        tb_log_dir_prefix = (f"NoExp_run_")
+
     i = 0
     while i < 1000:
         #Creates the PosixPath with run iteration appended
@@ -57,16 +51,14 @@ def get_summary_writer_log_dir(log_dir, exp_flag):
 
 # Tokenizer functions -------------------------------------------------
 
-def decode_text_noexp(tokenizer, text):
-    encoded_input = tokenizer(text)
+def decode_text(tokenizer, text, exp_flag, *args):
+    if exp_flag:
+        encoded_input = tokenizer(text, args[0]) #args[0]=explanations
+    else:
+        encoded_input = tokenizer(text)
+
     decoded_text = tokenizer.decode(encoded_input["input_ids"])
     return decoded_text
-
-def decode_text_exp(tokenizer, text, explanation):
-    encoded_input = tokenizer(text, explanation)
-    decoded_text = tokenizer.decode(encoded_input["input_ids"])
-    return decoded_text
-
 
 
 # Smaller datasets to speed up training ----------------------------
@@ -85,42 +77,30 @@ def create_smaller_dataset(tokenized_datasets):
 # Metrics -----------------------------------------------------
 
 def compute_metrics(accelerator, model, dataloader):
-    metric1 = load_metric("accuracy")
 
+    metric1 = load_metric("accuracy")
     metric2 = load_metric("f1")
     metric3 = load_metric("precision")
     metric4 = load_metric("recall")
-
     metric2_weighted = load_metric("f1")
     metric3_weighted = load_metric("precision")
     metric4_weighted  = load_metric("recall")
 
+    metrics = [metric1, metric2, metric3, metric4, metric2_weighted,
+        metric3_weighted, metric4_weighted]
+
     model.eval()
 
-    
     for batch in dataloader:
         with torch.no_grad():
             outputs = model(**batch)
 
         logits = outputs.logits
         predictions = torch.argmax(logits, dim=-1)
-        
-        metric1.add_batch(predictions=accelerator.gather(predictions),
-            references=accelerator.gather(batch['labels']))
-        metric2.add_batch(predictions=accelerator.gather(predictions),
-            references=accelerator.gather(batch['labels']))
-        metric3.add_batch(predictions=accelerator.gather(predictions),
-            references=accelerator.gather(batch['labels']))
-        metric4.add_batch(predictions=accelerator.gather(predictions),
-            references=accelerator.gather(batch['labels']))
 
-        metric2_weighted.add_batch(predictions=accelerator.gather(predictions),
-            references=accelerator.gather(batch['labels']))
-        metric3_weighted.add_batch(predictions=accelerator.gather(predictions),
-            references=accelerator.gather(batch['labels']))
-        metric4_weighted.add_batch(predictions=accelerator.gather(predictions),
-            references=accelerator.gather(batch['labels']))
-
+        for metric in metrics:
+            metric.add_batch(predictions=accelerator.gather(predictions),
+                references=accelerator.gather(batch['labels']))
 
     #Per class metrics
     labels = list(range(0,9))
@@ -161,47 +141,31 @@ def summary_writer_train(summary_writer, train_metrics, epoch):
                                      epoch+1)
      
 
-    summary_writer.add_scalars("Train f1 per class",
-                              {"f1_class_0/train": train_metrics["f1"][0],
-                              "f1_class_1/train" : train_metrics["f1"][1],
-                              "f1_class_2/train" : train_metrics["f1"][2],
-                              "f1_class_3/train" : train_metrics["f1"][3],
-                              "f1_class_4/train" : train_metrics["f1"][4],
-                              "f1_class_5/train" : train_metrics["f1"][5],
-                              "f1_class_6/train" : train_metrics["f1"][6],
-                              "f1_class_7/train" : train_metrics["f1"][7],
-                              "f1_class_8/train" : train_metrics["f1"][8]},
-                              epoch+1)
+    f1_train = {}
+    precision_train = {}
+    recall_train = {}
 
-
-    summary_writer.add_scalars("Train precision per class",
-                       {"precision_class_0/train" : train_metrics["precision"][0],
-                        "precision_class_1/train" : train_metrics["precision"][1],
-                        "precision_class_2/train" : train_metrics["precision"][2],
-                        "precision_class_3/train" : train_metrics["precision"][3],
-                        "precision_class_4/train" : train_metrics["precision"][4],
-                        "precision_class_5/train" : train_metrics["precision"][5],
-                        "precision_class_6/train" : train_metrics["precision"][6],
-                        "precision_class_7/train" : train_metrics["precision"][7],
-                        "precision_class_8/train" : train_metrics["precision"][8]},
-                        epoch+1)
+    for idx, val in enumerate(train_metrics["f1"]):
+        f1_train[f'f1_class_{idx}/train'] = val
     
+    for idx, val in enumerate(train_metrics["precision"]):
+        precision_train[f'precision_class_{idx}/train'] = val
+    
+    for idx, val in enumerate(train_metrics["recall"]):
+        recall_train[f'recall_class_{idx}/train'] = val
 
-    summary_writer.add_scalars("Train recall per class",
-                                {"recall_class_0/train" : train_metrics["recall"][0],
-                                 "recall_class_1/train" : train_metrics["recall"][1],
-                                 "recall_class_2/train" : train_metrics["recall"][2],
-                                 "recall_class_3/train" : train_metrics["recall"][3],
-                                 "recall_class_4/train" : train_metrics["recall"][4],
-                                 "recall_class_5/train" : train_metrics["recall"][5],
-                                 "recall_class_6/train" : train_metrics["recall"][6],
-                                 "recall_class_7/train" : train_metrics["recall"][7],
-                                 "recall_class_8/train" : train_metrics["recall"][8]},
-                                 epoch+1)
+    summary_writer.add_scalars("Train f1 per class", f1_train, epoch+1)
+
+    summary_writer.add_scalars("Train precision per class", precision_train,
+        epoch+1)
+
+    summary_writer.add_scalars("Train recall per class", recall_train, epoch+1)
+                               
 
 
 
 def summary_writer_test(summary_writer, test_metrics, epoch):
+
     summary_writer.add_scalars("Test averaged statistics",
                                  {"accuracy/test": test_metrics["accuracy"],
                                   "f1_weighted/test": test_metrics["f1_weighted"],
@@ -209,44 +173,27 @@ def summary_writer_test(summary_writer, test_metrics, epoch):
                                   "recall_weighted/test": test_metrics["recall_weighted"]},
                                   epoch+1)
 
+    f1_test = {}
+    precision_test = {}
+    recall_test = {}
 
-    summary_writer.add_scalars("Test f1 per class",
-                              {"f1_class_0/test": test_metrics["f1"][0],
-                              "f1_class_1/test" : test_metrics["f1"][1],
-                              "f1_class_2/test" : test_metrics["f1"][2],
-                              "f1_class_3/test" : test_metrics["f1"][3],
-                              "f1_class_4/test" : test_metrics["f1"][4],
-                              "f1_class_5/test" : test_metrics["f1"][5],
-                              "f1_class_6/test" : test_metrics["f1"][6],
-                              "f1_class_7/test" : test_metrics["f1"][7],
-                              "f1_class_8/test" : test_metrics["f1"][8]},
-                              epoch+1)
+    for idx, val in enumerate(test_metrics["f1"]):
+        f1_test[f'f1_class_{idx}/test'] = val
+    
+    for idx, val in enumerate(test_metrics["precision"]):
+        precision_test[f'precision_class_{idx}/test'] = val
+    
+    for idx, val in enumerate(test_metrics["recall"]):
+        recall_test[f'recall_class_{idx}/test'] = val
+
+    summary_writer.add_scalars("Test f1 per class", f1_test, epoch+1)
+
+    summary_writer.add_scalars("Test precision per class", precision_test,
+        epoch+1)
+
+    summary_writer.add_scalars("Test recall per class", recall_test, epoch+1)
 
 
-    summary_writer.add_scalars("Test precision per class",
-                       {"precision_class_0/test" : test_metrics["precision"][0],
-                        "precision_class_1/test" : test_metrics["precision"][1],
-                        "precision_class_2/test" : test_metrics["precision"][2],
-                        "precision_class_3/test" : test_metrics["precision"][3],
-                        "precision_class_4/test" : test_metrics["precision"][4],
-                        "precision_class_5/test" : test_metrics["precision"][5],
-                        "precision_class_6/test" : test_metrics["precision"][6],
-                        "precision_class_7/test" : test_metrics["precision"][7],
-                        "precision_class_8/test" : test_metrics["precision"][8]},
-                        epoch+1)
-   
-
-    summary_writer.add_scalars("Test recall per class",
-                            {"recall_class_0/test" : test_metrics["recall"][0],
-                             "recall_class_1/test" : test_metrics["recall"][1],
-                             "recall_class_2/test" : test_metrics["recall"][2],
-                             "recall_class_3/test" : test_metrics["recall"][3],
-                             "recall_class_4/test" : test_metrics["recall"][4],
-                             "recall_class_5/test" : test_metrics["recall"][5],
-                             "recall_class_6/test" : test_metrics["recall"][6],
-                             "recall_class_7/test" : test_metrics["recall"][7],
-                             "recall_class_8/test" : test_metrics["recall"][8]},
-                             epoch+1)
 
 
 # Visualizations ---------------------------------------------
@@ -304,6 +251,7 @@ def main():
     )
 
     logs_directory = get_summary_writer_log_dir(Path('logs'), exp_flag)
+    current_run_number = logs_directory.split("/")[-1]
 
     summary_writer = SummaryWriter(str(logs_directory), flush_secs=5)
 
@@ -337,7 +285,7 @@ def main():
     num_epochs = 3
     batch_size=8
 
-    output_directory_save_model = "./saved_model/"
+    output_directory_save_model = "./saved_model/" + current_run_number
 
     checkpoint = "bert-base-cased"
 
@@ -387,18 +335,18 @@ def main():
 
     # Log a few random samples from the tokenized dataset:
     for index in random.sample(range(len(tokenized_datasets['train'])), 4):
+
         if exp_flag:
             logger.info(f"Data point {index} of the tokenized training set sample: "
-            f"{decode_text_exp(tokenizer, raw_datasets['train'][index]['text'], raw_datasets['train'][index]['exp_and_td'])}.")
+            f"{decode_text(tokenizer, raw_datasets['train'][index]['text'], {exp_flag}, raw_datasets['train'][index]['exp_and_td'])}.")
         else:
             logger.info(f"Data point {index} of the tokenized training set sample: "
-            f"{decode_text_noexp(tokenizer, raw_datasets['train'][index]['text'])}.")
-
+            f"{decode_text(tokenizer, raw_datasets['train'][index]['text'],{exp_flag})}.")
 
         logger.info(f"Input IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['input_ids']}.")
         logger.info(f"Token type IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['token_type_ids']}.")
 
-
+    
     if flag_smaller_datasets:
         tokenized_datasets = create_smaller_dataset(tokenized_datasets)
 
@@ -478,9 +426,8 @@ def main():
     
 
     # Save model and tokenizer----------------------------------------------
-    #model.save_pretrained(output_directory_save_model)
-    #tokenizer.save_pretrained(output_directory_save_model)
-
+    model.save_pretrained(output_directory_save_model)
+    tokenizer.save_pretrained(output_directory_save_model)
 
 
 if __name__ == "__main__":
