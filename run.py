@@ -5,7 +5,6 @@ from pathlib import Path
 import argparse
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 from sklearn.metrics import ConfusionMatrixDisplay 
 
@@ -26,8 +25,15 @@ from tqdm.auto import tqdm
 
 from accelerate import Accelerator
 
-# Argparser -----------------------------------------------------------------
 
+from metrics import *
+from visualizations import *
+
+
+
+
+
+# Argparser -----------------------------------------------------------------
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Finetune NoExp or ExpBERT"+\
@@ -118,10 +124,11 @@ def parse_args():
 
     args = parser.parse_args()
  
-    if args.use_saved_model and args.saved_model_filepath is None:
-        raise ValueError("Need to provide the filepath of the saved model" +\
-        " you want to load.")
-    
+    if args.use_saved_model and (args.saved_model_filepath is None or
+        os.path.isfile(args.saved_model_filepath)):
+        raise ValueError("Need to provide the correct filepath of the" +\
+        " saved model you want to load.")
+
     if args.save_model and args.output_model is None:
         raise ValueError("Must provide directory to save model that will" +\
         " be trained")
@@ -137,23 +144,16 @@ def parse_args():
 
 
 
-
-
-
-
-
-
-
 # Summary writer helper functions --------------------------------------------
-def get_dir_numbered(log_dir, exp_flag):
+def get_filepath_numbered(log_dir, exp_flag, checkpoint):
     """Get a unique directory that hasn't been logged to before for use with a TB
     SummaryWriter.
     """ 
-    
+    checkpoint = checkpoint.replace("-","_") 
     if exp_flag:
-        tb_log_dir_prefix = (f"Exp_run_")
+        tb_log_dir_prefix = (f"Exp_{checkpoint}_run_")
     else:
-        tb_log_dir_prefix = (f"NoExp_run_")
+        tb_log_dir_prefix = (f"NoExp_{checkpoint}_run_")
 
     i = 0
     while i < 1000:
@@ -163,23 +163,6 @@ def get_dir_numbered(log_dir, exp_flag):
             return str(tb_log_dir)
         i += 1
     return str(tb_log_dir)
-
-def get_saved_model_dir(saved_model_dir, exp_flag):
-    if exp_flag:
-        saved_model_prefix = (f"Exp_run_")
-    else:
-        saved_model_prefix = (f"NoExp_run_")
-
-    i=0
-    while i < 1000:
-        #Creates the PosixPath with run iteration appended
-        tb_log_dir = log_dir / (tb_log_dir_prefix + str(i))
-        if not tb_log_dir.exists():
-            return str(tb_log_dir)
-        i += 1
-    return str(tb_log_dir)
-
-    model_saved_directory = "./saved_model/" + current_run.replace(current_run[-1], str(current_run_number-1))
 
 # Tokenizer functions -------------------------------------------------
 
@@ -206,176 +189,11 @@ def create_smaller_dataset(tokenized_datasets, seed):
     return small_datasets
 
 
-
-
-# Metrics -----------------------------------------------------
-
-def compute_metrics(accelerator, model, dataloader):
-
-    metric1 = load_metric("accuracy")
-    metric2 = load_metric("f1")
-    metric3 = load_metric("precision")
-    metric4 = load_metric("recall")
-    metric2_weighted = load_metric("f1")
-    metric3_weighted = load_metric("precision")
-    metric4_weighted  = load_metric("recall")
-
-    metrics = [metric1, metric2, metric3, metric4, metric2_weighted,
-        metric3_weighted, metric4_weighted]
-
-    model.eval()
-
-    for batch in dataloader:
-        with torch.no_grad():
-            outputs = model(**batch)
-
-        logits = outputs.logits
-        predictions = torch.argmax(logits, dim=-1)
-
-        for metric in metrics:
-            metric.add_batch(predictions=accelerator.gather(predictions),
-                references=accelerator.gather(batch['labels']))
-
-    #Per class metrics
-    labels = list(range(0,9))
-    f1 = metric2.compute(average=None, labels=labels)["f1"]
-    precision = metric3.compute(average=None, labels=labels)["precision"]
-    recall = metric4.compute(average=None, labels=labels)["recall"]
-
-
-    #Weighted metrics
-    accuracy = metric1.compute()["accuracy"]
-    f1_weighted = metric2_weighted.compute(average="weighted", labels=labels)["f1"]
-    precision_weighted = metric3_weighted.compute(average="weighted", labels=labels)["precision"]
-    recall_weighted = metric4_weighted.compute(average="weighted", labels=labels)["recall"]
-
-    results = {"accuracy": accuracy, 
-                "f1_weighted": f1_weighted,
-                "precision_weighted": precision_weighted,
-                "recall_weighted": recall_weighted,
-                "f1": f1,
-                "precision": precision,
-                "recall": recall
-            }
-
-    return results
-
-
-
-
-# Summary writers
-
-def summary_writer_train(summary_writer, train_metrics, epoch):
-    summary_writer.add_scalars("Train averaged statistics",
-                                    {"accuracy/train": train_metrics["accuracy"],
-                                     "f1_weighted/train": train_metrics["f1_weighted"],
-                                     "precision_weighted/train": train_metrics["precision_weighted"],
-                                     "recall_weighted/train":
-                                     train_metrics["recall_weighted"]},
-                                     epoch+1)
-     
-
-    f1_train = {}
-    precision_train = {}
-    recall_train = {}
-
-    for idx, val in enumerate(train_metrics["f1"]):
-        f1_train[f'f1_class_{idx}/train'] = val
-    
-    for idx, val in enumerate(train_metrics["precision"]):
-        precision_train[f'precision_class_{idx}/train'] = val
-    
-    for idx, val in enumerate(train_metrics["recall"]):
-        recall_train[f'recall_class_{idx}/train'] = val
-
-    summary_writer.add_scalars("Train f1 per class", f1_train, epoch+1)
-
-    summary_writer.add_scalars("Train precision per class", precision_train,
-        epoch+1)
-
-    summary_writer.add_scalars("Train recall per class", recall_train, epoch+1)
-                               
-
-
-
-def summary_writer_test(summary_writer, test_metrics, epoch):
-
-    summary_writer.add_scalars("Test averaged statistics",
-                                 {"accuracy/test": test_metrics["accuracy"],
-                                  "f1_weighted/test": test_metrics["f1_weighted"],
-                                  "precision_weighted/test": test_metrics["precision_weighted"],
-                                  "recall_weighted/test": test_metrics["recall_weighted"]},
-                                  epoch+1)
-
-    f1_test = {}
-    precision_test = {}
-    recall_test = {}
-
-    for idx, val in enumerate(test_metrics["f1"]):
-        f1_test[f'f1_class_{idx}/test'] = val
-    
-    for idx, val in enumerate(test_metrics["precision"]):
-        precision_test[f'precision_class_{idx}/test'] = val
-    
-    for idx, val in enumerate(test_metrics["recall"]):
-        recall_test[f'recall_class_{idx}/test'] = val
-
-    summary_writer.add_scalars("Test f1 per class", f1_test, epoch+1)
-
-    summary_writer.add_scalars("Test precision per class", precision_test,
-        epoch+1)
-
-    summary_writer.add_scalars("Test recall per class", recall_test, epoch+1)
-
-
-
-
-# Visualizations ---------------------------------------------
-
-def create_confusion_matrix(labels, predictions, current_run):
-    ConfusionMatrixDisplay.from_predictions(predictions, labels,
-        labels=list(range(0,9)))
-    
-    filepath = "./plots/" + current_run + "_confusion_matrix.png"
-    plt.savefig(filepath, bbox_inches='tight')
-    #plt.show()
-
-
-def visualizations(accelerator, model, dataloader, current_run):
-    labels = []
-    predictions = []
-    model.eval()
-
-    for batch in dataloader:
-        with torch.no_grad():
-            outputs = model(**batch)
-
-        logits = outputs.logits
-        prediction = torch.argmax(logits, dim=-1)
-        prediction = accelerator.gather(prediction).detach().cpu().numpy()
-        label = accelerator.gather(batch['labels']).detach().cpu().numpy()
-        labels.append(label)
-        predictions.append(prediction)
-       
-    #Flattens array even when subarrays aren't of equal dimension (due to batch
-    # size)
-    labels = np.hstack(np.array(labels, dtype=object))
-    predictions = np.hstack(np.array(predictions, dtype=object))
-
-    print(labels)
-    print(predictions)
-    
-    # Individual visualizations
-    create_confusion_matrix(labels, predictions, current_run)
-
-
-
 # Main -------------------------------------------------------------------
 
 
 def main():
     args = parse_args()
-    print(args.exp_flag)
 
     # Logger and summary writer --------------------------------------------
     logger = logging.getLogger(__name__)
@@ -385,11 +203,16 @@ def main():
         level=logging.INFO,
     )
 
-    logs_directory = get_dir_numbered(Path(args.output_logs), args.exp_flag)
-    current_run = logs_directory.split("/")[-1]
+    logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
+        args.checkpoint)
+
+    current_run = logs_filepath.split("/")[-1]
     current_run_number = int(current_run.split("_")[-1])
 
-    summary_writer = SummaryWriter(str(logs_directory), flush_secs=5)
+    print(current_run)
+    print(current_run_number)
+
+    summary_writer = SummaryWriter(str(logs_filepath), flush_secs=5)
 
     accelerator = Accelerator()
 
@@ -422,23 +245,16 @@ def main():
     #Use latest model that was saved
     #Need to shift run number by -1 as latest model that has been trained is
     #current run - 1
-    output_directory_save_model = get_dir_numbered(Path(args.output_model), args.exp_flag)
-
-    model_saved_run_number = int(output_directory_save_model.split("_")[-1])-1
-    model_saved_directory = \
-        output_directory_save_model.replace(output_directory_save_model.split("_")[-1], \
-        str(model_saved_run_number))
-
-    #Do not allow model to be loaded if saved model is empty
-    if not os.listdir(model_saved_directory.split("/")[0]):
-        args.use_saved_model = False
+    output_directory_save_model = get_filepath_numbered(Path(args.output_model),
+        args.exp_flag, args.checkpoint)
 
     #Model is set to evaluation mode by default using model.eval()
     #Using checkpoint is much quicker as model and tokenizer are cached by Huggingface
     if args.use_saved_model:
-        model = AutoModelForSequenceClassification.from_pretrained(model_saved_directory,
+        model = \
+        AutoModelForSequenceClassification.from_pretrained(args.saved_model_filepath,
             num_labels=9)
-        tokenizer = AutoTokenizer.from_pretrained(model_saved_directory)
+        tokenizer = AutoTokenizer.from_pretrained(model_saved_filepath)
     else:
         model = AutoModelForSequenceClassification.from_pretrained(args.checkpoint,
             num_labels=9)
