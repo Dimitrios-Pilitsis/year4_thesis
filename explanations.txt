@@ -4,7 +4,6 @@ they are dead
 he is injured
 she is injured
 they are injured
-
 he is missing
 she is missing
 they are missing
@@ -17,32 +16,21 @@ they were found
 he was rescued
 she was rescued 
 they were rescued
-
 people sent to shelter
 people were evacuated
-
-
 home was damanged
 heavily damaged
 no electricity
 no water
 no heating
-
-
 provide emergency relief
 people donate
 provide relief
-
-
 be careful
 warning issued
 being helpful
-
-
 prayers
 praying for citizens
 thoughts are with people
-
-
 help victims
 people getting help

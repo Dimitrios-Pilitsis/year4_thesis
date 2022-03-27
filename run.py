@@ -2,6 +2,7 @@ import logging
 import random
 import os
 from pathlib import Path
+import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,6 +25,122 @@ from datasets import load_from_disk, load_metric, DatasetDict
 from tqdm.auto import tqdm
 
 from accelerate import Accelerator
+
+# Argparser -----------------------------------------------------------------
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Finetune NoExp or ExpBERT"+\
+    " model on natural disaster tweet classification task")
+
+    # Flags --------------------------------------------------------------
+    parser.add_argument(
+        '--exp-flag', 
+        action='store_true', 
+        help="Run ExpBERT"
+    )
+
+    parser.add_argument(
+        "--full-logger",
+        action="store_true",
+        help="Set all logger settings on (including library loggers).",
+    )
+    
+    parser.add_argument(
+        "--smaller-dataset",
+        action="store_true",
+        help="Use smaller dataset for training and evaluation.",
+    )
+
+    parser.add_argument(
+        "--use-saved-model",
+        action="store_true",
+        help="Use model that you have saved from previous run.",
+    )
+
+    parser.add_argument(
+        "--save-model",
+        action="store_true",
+        help="Save the model that you will train.",
+    )
+
+    parser.add_argument(
+        '--eval', 
+        action='store_true'
+    )
+
+    # Directories -------------------------------------------------------------
+    parser.add_argument(
+        "--output-logs", 
+        type=str, 
+        default="logs", 
+        help="Where to store the logs of the model."
+    )
+
+    parser.add_argument(
+        "--saved-model-filepath", 
+        type=str, 
+        default=None, 
+        help="Location of the model that has been saved that will be used for training."
+    )
+
+    parser.add_argument(
+        "--output-model", 
+        type=str, 
+        default="saved_model", 
+        help="Location of where to save the model that will be trained."
+    )
+
+    # Others ------------------------------------------------------------------
+    parser.add_argument(
+        "--checkpoint", 
+        type=str, 
+        default="bert-base-cased", 
+        help="Specify the checkpoint of your model e.g. bert-base-cased."
+    )
+
+    parser.add_argument(
+        "--num-epochs", 
+        type=int, 
+        default=3, 
+        help="Total number of epochs to perform during training."
+    )
+
+    parser.add_argument(
+        "--seed", 
+        type=int, 
+        default=None, 
+        help="A seed for dataset shuffling."
+    )
+
+    
+    # Sanity checks ------------------------------------------------------
+
+    args = parser.parse_args()
+ 
+    if args.use_saved_model and args.saved_model_filepath is None:
+        raise ValueError("Need to provide the filepath of the saved model" +\
+        " you want to load.")
+    
+    if args.save_model and args.output_model is None:
+        raise ValueError("Must provide directory to save model that will" +\
+        " be trained")
+
+    if len(args.checkpoint) > 0 and args.use_saved_model:
+        raise ValueError("Can't provide checkpoint and saved model directory")
+
+    if args.eval and args.use_saved_model == False:
+        raise ValueError("Can only evaluate a model that has been saved before.")
+
+    return args
+
+
+
+
+
+
+
+
 
 
 
@@ -67,7 +184,9 @@ def get_saved_model_dir(saved_model_dir, exp_flag):
 # Tokenizer functions -------------------------------------------------
 
 def decode_text(tokenizer, text, exp_flag, *args):
+    print(exp_flag)
     if exp_flag:
+        print("WRONG")
         encoded_input = tokenizer(text, args[0]) #args[0]=explanations
     else:
         encoded_input = tokenizer(text)
@@ -77,11 +196,11 @@ def decode_text(tokenizer, text, exp_flag, *args):
 
 
 # Smaller datasets to speed up training ----------------------------
-def create_smaller_dataset(tokenized_datasets):
+def create_smaller_dataset(tokenized_datasets, seed):
     small_train_dataset = \
-        tokenized_datasets["train"].shuffle(seed=42).select(range(80))
+        tokenized_datasets["train"].shuffle(seed).select(range(80))
     small_test_dataset = \
-        tokenized_datasets["test"].shuffle(seed=42).select(range(20))
+        tokenized_datasets["test"].shuffle(seed).select(range(20))
 
     small_datasets = DatasetDict({"train": small_train_dataset, "test": small_test_dataset})
     return small_datasets
@@ -219,7 +338,7 @@ def create_confusion_matrix(labels, predictions, current_run):
     
     filepath = "./plots/" + current_run + "_confusion_matrix.png"
     plt.savefig(filepath, bbox_inches='tight')
-    plt.show()
+    #plt.show()
 
 
 def visualizations(accelerator, model, dataloader, current_run):
@@ -255,8 +374,8 @@ def visualizations(accelerator, model, dataloader, current_run):
 
 
 def main():
-
-    exp_flag = True
+    args = parse_args()
+    print(args.exp_flag)
 
     # Logger and summary writer --------------------------------------------
     logger = logging.getLogger(__name__)
@@ -266,7 +385,7 @@ def main():
         level=logging.INFO,
     )
 
-    logs_directory = get_dir_numbered(Path('logs'), exp_flag)
+    logs_directory = get_dir_numbered(Path(args.output_logs), args.exp_flag)
     current_run = logs_directory.split("/")[-1]
     current_run_number = int(current_run.split("_")[-1])
 
@@ -276,9 +395,9 @@ def main():
 
     logger.info(accelerator.state)
 
-    full_logger = False
+    args.full_logger = False
 
-    if full_logger:
+    if args.full_logger:
         # Setup logging, we only want one process per machine to log things on the
         # screen.
         # accelerator.is_local_main_process is only True for one process per machine.
@@ -297,16 +416,13 @@ def main():
 
     # Important variables and flags --------------------------------------------
     # TODO: turn variables into arguments passed from calling program
-    flag_smaller_datasets = True
-    use_saved_model = False
 
-    num_epochs = 3
     batch_size=8
     
     #Use latest model that was saved
     #Need to shift run number by -1 as latest model that has been trained is
     #current run - 1
-    output_directory_save_model = get_dir_numbered(Path('saved_model'), exp_flag)
+    output_directory_save_model = get_dir_numbered(Path(args.output_model), args.exp_flag)
 
     model_saved_run_number = int(output_directory_save_model.split("_")[-1])-1
     model_saved_directory = \
@@ -315,33 +431,30 @@ def main():
 
     #Do not allow model to be loaded if saved model is empty
     if not os.listdir(model_saved_directory.split("/")[0]):
-        use_saved_model = False
+        args.use_saved_model = False
 
     #Model is set to evaluation mode by default using model.eval()
     #Using checkpoint is much quicker as model and tokenizer are cached by Huggingface
-    if use_saved_model:
+    if args.use_saved_model:
         model = AutoModelForSequenceClassification.from_pretrained(model_saved_directory,
             num_labels=9)
         tokenizer = AutoTokenizer.from_pretrained(model_saved_directory)
     else:
-        checkpoint = "bert-base-cased"
-        model = AutoModelForSequenceClassification.from_pretrained(checkpoint,
+        model = AutoModelForSequenceClassification.from_pretrained(args.checkpoint,
             num_labels=9)
-        tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-
-
+        tokenizer = AutoTokenizer.from_pretrained(args.checkpoint)
 
     # Loading dataset ---------------------------------------------
-    if exp_flag:
+    if args.exp_flag:
         raw_datasets = load_from_disk("./dataset/crisis_dataset/exp/")
     else:
         raw_datasets = load_from_disk("./dataset/crisis_dataset/noexp/")
-
+    
     # Log a few random samples from the training set:
     for index in random.sample(range(len(raw_datasets['train'])), 4):
         logger.info(f"Text of data point {index} of the training set sample: {raw_datasets['train'][index]['text']}.")
         logger.info(f"Explanation of data point {index} of the training set "
-                    f"example: {raw_datasets['train'][index]['exp_and_td']}.") if exp_flag else None
+                    f"example: {raw_datasets['train'][index]['exp_and_td']}.") if args.exp_flag else None
         logger.info(f"Label of data point {index} of the training set sample: {raw_datasets['train'][index]['labels']}.")
 
 
@@ -355,7 +468,7 @@ def main():
         return tokenizer(examples['text'], examples['exp_and_td'],
             truncation=True)
 
-    if exp_flag:
+    if args.exp_flag:
         tokenized_datasets = raw_datasets.map(tokenize_exp_function, batched=True)
         tokenized_datasets = tokenized_datasets.remove_columns(["exp_and_td"])
     else:
@@ -372,19 +485,21 @@ def main():
     # Log a few random samples from the tokenized dataset:
     for index in random.sample(range(len(tokenized_datasets['train'])), 4):
 
-        if exp_flag:
+        if args.exp_flag:
             logger.info(f"Data point {index} of the tokenized training set sample: "
-            f"{decode_text(tokenizer, raw_datasets['train'][index]['text'], {exp_flag}, raw_datasets['train'][index]['exp_and_td'])}.")
+            #f"{decode_text(tokenizer, raw_datasets['train'][index]['text'], {args.exp_flag}, raw_datasets['train'][index]['exp_and_td'])}.")
+            f"{decode_text(tokenizer, raw_datasets['train'][index]['text'], args.exp_flag, raw_datasets['train'][index]['exp_and_td'])}.")
         else:
             logger.info(f"Data point {index} of the tokenized training set sample: "
-            f"{decode_text(tokenizer, raw_datasets['train'][index]['text'],{exp_flag})}.")
+            f"{decode_text(tokenizer, raw_datasets['train'][index]['text'],args.exp_flag)}.")
 
         logger.info(f"Input IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['input_ids']}.")
         logger.info(f"Token type IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['token_type_ids']}.")
 
     
-    if flag_smaller_datasets:
-        tokenized_datasets = create_smaller_dataset(tokenized_datasets)
+    if args.smaller_dataset:
+        tokenized_datasets = create_smaller_dataset(tokenized_datasets,
+            args.seed)
 
     tokenized_datasets.set_format("torch")
 
@@ -406,7 +521,7 @@ def main():
         train_dataloader, test_dataloader, model, optimizer
     )
 
-    num_training_steps = num_epochs * len(train_dataloader)
+    num_training_steps = args.num_epochs * len(train_dataloader)
 
     lr_scheduler = get_scheduler(
         name="linear", 
@@ -420,12 +535,12 @@ def main():
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {tokenized_datasets['train'].num_rows}")
-    logger.info(f"  Num Epochs = {num_epochs}")
+    logger.info(f"  Num Epochs = {args.num_epochs}")
     logger.info(f"  Num training steps = {num_training_steps}")
     logger.info(f"  Instantaneous batch size per device = {batch_size}")
     progress_bar = tqdm(range(num_training_steps), disable=not accelerator.is_local_main_process)
 
-    for epoch in range(num_epochs):
+    for epoch in range(args.num_epochs):
         model.train()
         for batch in train_dataloader:
             outputs = model(**batch)
@@ -462,8 +577,7 @@ def main():
     
 
     # Save model and tokenizer---------------------------------------------
-    save_model_tokenizer = False
-    if save_model_tokenizer:
+    if args.save_model:
         model.save_pretrained(output_directory_save_model)
         tokenizer.save_pretrained(output_directory_save_model)
 
