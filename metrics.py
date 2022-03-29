@@ -63,65 +63,35 @@ def compute_metrics(accelerator, model, dataloader):
 
 # Summary writers ------------------------------------------------------------------
 
-def summary_writer_train(summary_writer, train_metrics, epoch):
-    summary_writer.add_scalars("Train averaged statistics",
-                                    {"accuracy/train": train_metrics["accuracy"],
-                                     "f1_weighted/train": train_metrics["f1_weighted"],
-                                     "precision_weighted/train": train_metrics["precision_weighted"],
-                                     "recall_weighted/train":
-                                     train_metrics["recall_weighted"]},
-                                     epoch+1)
-     
+def summary_writer_metrics(summary_writer, metrics, epoch, train_flag):
+    if train_flag:
+        current_set = "train"
+    else:
+        current_set = "test"
 
-    f1_train = {}
-    precision_train = {}
-    recall_train = {}
+    summary_writer.add_scalars(f"{current_set} averaged statistics",
+                                 {f"accuracy/{current_set}": metrics["accuracy"],
+                                 f"f1_weighted/{current_set}": metrics["f1_weighted"],
+                                 f"precision_weighted/{current_set}": metrics["precision_weighted"],
+                                 f"recall_weighted/{current_set}": metrics["recall_weighted"]},
+                                 epoch+1)
 
-    for idx, val in enumerate(train_metrics["f1"]):
-        f1_train[f'f1_class_{idx}/train'] = val
+    f1 = {}
+    precision = {}
+    recall = {}
+
+    for idx, val in enumerate(metrics["f1"]):
+        f1[f'f1_class_{idx}/{current_set}'] = val
     
-    for idx, val in enumerate(train_metrics["precision"]):
-        precision_train[f'precision_class_{idx}/train'] = val
+    for idx, val in enumerate(metrics["precision"]):
+        precision[f'precision_class_{idx}/{current_set}'] = val
     
-    for idx, val in enumerate(train_metrics["recall"]):
-        recall_train[f'recall_class_{idx}/train'] = val
+    for idx, val in enumerate(metrics["recall"]):
+        recall[f'recall_class_{idx}/{current_set}'] = val
 
-    summary_writer.add_scalars("Train f1 per class", f1_train, epoch+1)
+    summary_writer.add_scalars(f"{current_set} f1 per class", f1, epoch+1)
 
-    summary_writer.add_scalars("Train precision per class", precision_train,
+    summary_writer.add_scalars(f"{current_set} precision per class", precision,
         epoch+1)
 
-    summary_writer.add_scalars("Train recall per class", recall_train, epoch+1)
-                               
-
-
-
-def summary_writer_test(summary_writer, test_metrics, epoch):
-
-    summary_writer.add_scalars("Test averaged statistics",
-                                 {"accuracy/test": test_metrics["accuracy"],
-                                  "f1_weighted/test": test_metrics["f1_weighted"],
-                                  "precision_weighted/test": test_metrics["precision_weighted"],
-                                  "recall_weighted/test": test_metrics["recall_weighted"]},
-                                  epoch+1)
-
-    f1_test = {}
-    precision_test = {}
-    recall_test = {}
-
-    for idx, val in enumerate(test_metrics["f1"]):
-        f1_test[f'f1_class_{idx}/test'] = val
-    
-    for idx, val in enumerate(test_metrics["precision"]):
-        precision_test[f'precision_class_{idx}/test'] = val
-    
-    for idx, val in enumerate(test_metrics["recall"]):
-        recall_test[f'recall_class_{idx}/test'] = val
-
-    summary_writer.add_scalars("Test f1 per class", f1_test, epoch+1)
-
-    summary_writer.add_scalars("Test precision per class", precision_test,
-        epoch+1)
-
-    summary_writer.add_scalars("Test recall per class", recall_test, epoch+1)
-
+    summary_writer.add_scalars(f"{current_set} recall per class", recall, epoch+1)

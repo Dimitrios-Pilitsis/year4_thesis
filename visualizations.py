@@ -2,7 +2,9 @@ import torch
 
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.patches as pt
+import seaborn as sns
+
+import pandas as pd
 
 from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import roc_curve, auc
@@ -14,8 +16,42 @@ import torch
 
 from torch.utils.tensorboard import SummaryWriter
 
+# Dataset visualizations -------------------------------------------------
+def label_count_plot(filepath, exp_flag):
+    data = pd.read_csv(filepath, header=0)
+    count_plot = sns.countplot(data['labels'])
+    fig = count_plot.get_figure()
+    if exp_flag:
+        filepath = "./plots/Exp_label_count.png"
+        count_plot.set_title('Label count of explanation dataset')
+    else:
+        filepath = "./plots/NoExp_label_count.png"
+        count_plot.set_title('Label count of no explanation dataset')
 
-# Visualizations ---------------------------------------------
+    fig.savefig(filepath, bbox_inches='tight')
+
+
+def label_distribution_plot(filepath):
+    df = pd.read_csv(filepath, header=0)
+    counts = df.groupby('labels').count()/len(df.index) #percentage of each label
+    data = (counts['text']*100)
+    bar_plot = sns.barplot(list(range(len(data))), data)
+    bar_plot.set_title('Label distribution of dataset')
+    bar_plot.set_xlabel("Label")
+    bar_plot.set_ylabel("Percentage (%)")
+    fig = bar_plot.get_figure()
+    fig.savefig("./plots/label_distribution.png", bbox_inches='tight')
+
+def visualizations_dataset(noexp_fp, exp_fp):
+    label_distribution_plot(noexp_fp)
+    label_count_plot(exp_fp, True)
+    label_count_plot(noexp_fp, False)
+
+
+
+
+
+# Model metric visualizations ---------------------------------------------
 def get_preds_and_labels(accelerator, model, dataloader):
     labels = []
     predictions = []
@@ -59,6 +95,10 @@ def get_preds_and_labels(accelerator, model, dataloader):
     return predictions, labels
 
 
+
+
+
+
 def summary_writer_pr_curves(summary_writer, accelerator, model, dataloader, epoch):
     
     predictions, labels = get_preds_and_labels(accelerator, model, dataloader)
@@ -71,46 +111,35 @@ def summary_writer_pr_curves(summary_writer, accelerator, model, dataloader, epo
 
 
 
+
+
 def create_roc_curves(accelerator, model, dataloader, current_run):
     predictions, labels = get_preds_and_labels(accelerator, model, dataloader)
 
-    l = list(range(0,9))
-    # Create precision recall curves ----------------------------------
-    #for val in l:
-    #    summary_writer.add_pr_curve(f"PR curve for class {val}", labels[val],
-    #        predictions[val], epoch+1) 
-
+    n_classes = 9
 
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
-    for i in l:
+
+    for i in range(0,n_classes):
         fpr[i], tpr[i], _ = roc_curve(labels[i], predictions[i])
-        #roc_auc[i] = auc(fpr[i], tpr[i])
     
     #Replace nan with 0 and calculate area under curve (AUC)
-    for i in l:
+    for i in range(0,n_classes):
         fpr[i] = np.nan_to_num(fpr[i], nan=0)
         tpr[i] = np.nan_to_num(tpr[i], nan=0)
         roc_auc[i] = auc(fpr[i], tpr[i])
 
-
-    print(fpr)
-    print("\n")
-    print(tpr)
-    print(roc_auc)
-
-    
-    n_classes = 9
-    # First aggregate all false positive rates
+    # Aggregate all false positive rates
     all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
 
-    # Then interpolate all ROC curves at this points
+    # Interpolate all ROC curves
     mean_tpr = np.zeros_like(all_fpr)
     for i in range(n_classes):
         mean_tpr += np.interp(all_fpr, fpr[i], tpr[i])
 
-    # Finally average it and compute AUC
+    # average values and compute AUC
     mean_tpr /= n_classes
 
     fpr["macro"] = all_fpr
@@ -129,12 +158,6 @@ def create_roc_curves(accelerator, model, dataloader, current_run):
         linewidth=4,
     )
 
-    #colors = cycle(['black', 'gray', 'brown', 'r', 'lightsalmon',
-    #    'saddlebrown', 'orange', 'olive', 'yellow'])
-        #'saddlebrown', 'orange', 'olive', 'yellow', 'g', 'lime', 'turquoise',
-        #'cyan', 'navy', 'b', 'purple', 'magenta', 'm', 'pink'])
-    #colors = cycle(["aqua", "darkorange", "cornflowerblue"])
-
     colors = cycle(['black', 'gray', 'r', 'g', 'b', 'orange', 'purple', 'pink',
         'm'])
 
@@ -152,20 +175,16 @@ def create_roc_curves(accelerator, model, dataloader, current_run):
     plt.ylim([0.0, 1.05])
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate")
-    plt.title("Receiver operating characteristic (ROC) plots for all classes")
-    #plt.legend(loc="lower right")
-
-	#legend_content = [pt.Patch(color=colors_legend[i], label=continents_legend[i]) for i in range(len(continents_legend))]
-	#plt.legend(handles=legend_content, loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.title("Receiver operating characteristic (ROC) multiclass plots")
 
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
-
     filepath = "./plots/" + current_run + "_roc_curve.png"
-    plt.savefig(filepath)
-    #plt.savefig(filepath, dpi=600)
 
-    plt.show()
+    #bbox_inches=tight makes sure everything fits in the saved image (including
+    #legend)
+    plt.savefig(filepath, bbox_inches='tight')
+
 
 
 
@@ -194,7 +213,9 @@ def create_confusion_matrix(accelerator, model, dataloader, current_run, epoch):
 
     ConfusionMatrixDisplay.from_predictions(predictions, true_values,
         labels=list(range(0, 9)))
-    
+      
+    plt.title("Confusion matrix")
+
     filepath = "./plots/" + current_run + "_confusion_matrix.png"
     plt.savefig(filepath, bbox_inches='tight')
     #plt.show()

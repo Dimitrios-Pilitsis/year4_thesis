@@ -11,6 +11,8 @@ import emoji
 
 import seaborn as sns
 
+from visualizations import *
+
 # Important variables ------------------------------------------------------
 #TODO: make variables into arguments passed from calling program
 
@@ -39,7 +41,7 @@ def inspect_labels(df):
 
 
 
-# Functions to clean datasets
+# Functions to clean tweets - -----------------------------------------------
 def camel_case_split(word):
     start_idx = [i for i, e in enumerate(word) if e.isupper()] + [len(word)]
     start_idx = [0] + start_idx
@@ -74,6 +76,7 @@ def placeholders(texts):
     return texts
 
 
+# Clean datasets -----------------------------------------------
 
 def clean_individual_dataset(filepath):
     df = pd.read_csv(filepath, sep="\t", header=0)
@@ -135,9 +138,8 @@ def create_explanations_dataset(df, explanations):
     df.insert(1, "exp_and_td", ex_td, allow_duplicates = True)
     return df
 
+# Dataset helper functions ----------------------------------
 
-
-# Clean dataset functions -------------------------------------
 def obtain_filepaths(directory_of_datasets):
     filepaths = []
     for subdir, dirs, files in os.walk(directory_of_datasets):
@@ -155,6 +157,7 @@ def check_for_duplicate_tweets(df):
     return df
 
 
+# Clean dataset functions -------------------------------------
 def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
     ds_exp_fp):
     dataframes = []
@@ -195,37 +198,12 @@ def split_dataset(dataset_complete_filepath):
         seed=42, shuffle=True)
     return data
 
-def label_count_plot(filepath, exp_flag):
-    data = pd.read_csv(filepath, header=0)
-    count_plot = sns.countplot(data['labels'])
-    fig = count_plot.get_figure()
-    if exp_flag:
-        filepath = "./plots/Exp_label_count.png"
-    else:
-        filepath = "./plots/NoExp_label_count.png"
 
-    fig.savefig(filepath, bbox_inches='tight')
-
-
-def label_distribution_plot(filepath):
-    df = pd.read_csv(filepath, header=0)
-    counts = df.groupby('labels').count()/len(df.index) #percentage of each label
-    data = (counts['text']*100)
-    bar_plot = sns.barplot(list(range(len(data))), data)
-    bar_plot.set_xlabel("Label")
-    bar_plot.set_ylabel("Percentage")
-    fig = bar_plot.get_figure()
-    fig.savefig("./plots/label_distribution.png", bbox_inches='tight')
-
+# Main -------------------------------------------------------------
 def main():
-    label_distribution_plot(dataset_complete_noexp_filepath)
-    exit(0)
+    visualizations_dataset(dataset_complete_noexp_filepath,
+        dataset_complete_exp_filepath)
 
-
-    label_count_plot(dataset_complete_exp_filepath, True)
-    label_count_plot(dataset_complete_noexp_filepath, False)
-
-    exit(0)
     run_create_csv(directory_of_original_datasets, explanations_filepath,
         dataset_complete_noexp_filepath,dataset_complete_exp_filepath)
 

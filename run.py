@@ -164,6 +164,8 @@ def get_filepath_numbered(log_dir, exp_flag, checkpoint):
         i += 1
     return str(tb_log_dir)
 
+
+
 # Tokenizer functions -------------------------------------------------
 
 def decode_text(tokenizer, text, exp_flag, *args):
@@ -205,11 +207,9 @@ def main():
     logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
         args.checkpoint)
 
+    #current run is the name used for all visualizations for a specific run
     current_run = logs_filepath.split("/")[-1]
     current_run_number = int(current_run.split("_")[-1])
-
-    print(current_run)
-    print(current_run_number)
 
     summary_writer = SummaryWriter(str(logs_filepath), flush_secs=5)
 
@@ -371,8 +371,9 @@ def main():
 
         train_metrics = compute_metrics(accelerator, model, train_dataloader)
         logger.info(f"Epoch {epoch + 1} train results: {train_metrics}")
-        summary_writer_train(summary_writer, train_metrics, epoch)
-
+        #summary_writer_train(summary_writer, train_metrics, epoch)
+        summary_writer_metrics(summary_writer, train_metrics, epoch,
+            train_flag=True)
         #visualizations(summary_writer, accelerator, model, test_dataloader,
         #    current_run, epoch)
         #exit(0)
@@ -381,8 +382,10 @@ def main():
         test_metrics = compute_metrics(accelerator, model, test_dataloader)
         logger.info(f"Epoch {epoch + 1} Test results: {test_metrics}")
         
-        summary_writer_test(summary_writer, test_metrics, epoch)
+        #summary_writer_test(summary_writer, test_metrics, epoch)
          
+        summary_writer_metrics(summary_writer, train_metrics, epoch,
+            train_flag=False)
     # Plots for final model parameters ------------------------------------------------
     visualizations(summary_writer, accelerator, model, test_dataloader,
         current_run, epoch)
