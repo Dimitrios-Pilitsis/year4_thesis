@@ -3,6 +3,7 @@ from accelerate import Accelerator
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from datasets import load_from_disk, load_metric, DatasetDict
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -124,59 +125,3 @@ def summary_writer_test(summary_writer, test_metrics, epoch):
 
     summary_writer.add_scalars("Test recall per class", recall_test, epoch+1)
 
-
-# Visualizations ---------------------------------------------------------
-def summary_writer_pr_curves(accelerator, model, dataloader, current_run):
-    labels = []
-    predictions = []
-    model.eval()
-
-    for batch in dataloader:
-        with torch.no_grad():
-            outputs = model(**batch)
-
-        logits = outputs.logits
-        softmax = torch.nn.Softmax(dim=0)
-        prediction = softmax(logits)
-        prediction = accelerator.gather(prediction).detach().cpu().numpy()
-        label = accelerator.gather(batch['labels']).detach().cpu().numpy()
-
-        labels.append(label)
-        predictions.append(prediction)
-       
-    #Flattens array even when subarrays aren't of equal dimension (due to batch
-    # size)
-    labels = np.hstack(np.array(labels, dtype=object))
-
-
-    l = list(range(0,9))
-    #Binarize predictions
-    #labels = np.hstack(np.array(labels, dtype=object))
-    predictions = np.array(predictions)
-    print(predictions)
-    predictions = np.reshape(predictions, (-1,
-        predictions.shape[2])).transpose()
-    predictions = np.split(predictions, 9, axis=0)
-    print(len(predictions))
-    print(predictions[0].shape)
-
-
-
-
-    # Binarize labels to have 9 arrays, 1 for each label
-    final_labels = []
-    for val in l:
-        x = np.where(labels != val, -1, labels)
-        x = np.where(x == val, 1, x)
-        x = np.where(x == -1, 0, x)
-        final_labels.append(x)
-
-
-    #Flatten list of numpy arrays
-    predictions = np.concatenate(predictions).ravel()
-
-    #Predictions are ready, they are probabilities for y_predo
-
-    #Need to convert labels into correct form for pr_curve()
-    print(final_labels)
-    #We get 9 arrrays of (80,) where 80 is number of datapoints

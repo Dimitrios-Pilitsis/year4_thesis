@@ -169,7 +169,6 @@ def get_filepath_numbered(log_dir, exp_flag, checkpoint):
 def decode_text(tokenizer, text, exp_flag, *args):
     print(exp_flag)
     if exp_flag:
-        print("WRONG")
         encoded_input = tokenizer(text, args[0]) #args[0]=explanations
     else:
         encoded_input = tokenizer(text)
@@ -374,8 +373,8 @@ def main():
         logger.info(f"Epoch {epoch + 1} train results: {train_metrics}")
         summary_writer_train(summary_writer, train_metrics, epoch)
 
-        #Visualizations so I don't wait for entire model to train
-        #visualizations(accelerator, model, train_dataloader, current_run)
+        #visualizations(summary_writer, accelerator, model, test_dataloader,
+        #    current_run, epoch)
         #exit(0)
         # Testing ----------------------------------------------------------------------
         logger.info(f"***** Running test set Epoch {epoch + 1}*****")
@@ -383,10 +382,10 @@ def main():
         logger.info(f"Epoch {epoch + 1} Test results: {test_metrics}")
         
         summary_writer_test(summary_writer, test_metrics, epoch)
-    
-
+         
     # Plots for final model parameters ------------------------------------------------
-    visualizations(accelerator, model, test_dataloader, current_run)
+    visualizations(summary_writer, accelerator, model, test_dataloader,
+        current_run, epoch)
 
 
     summary_writer.close()

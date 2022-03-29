@@ -33,8 +33,11 @@ def create_confusion_matrix(accelerator, model, dataloader, current_run, epoch):
        
     #Flattens array even when subarrays aren't of equal dimension (due to batch
     # size)
-    true_values = np.hstack(np.array(true_values, dtype=int))
-    predictions = np.hstack(np.array(predictions, dtype=int))
+    true_values = np.hstack(true_values).astype(int)
+    predictions = np.hstack(predictions).astype(int)
+
+    print(true_values)
+    print(predictions)
 
     ConfusionMatrixDisplay.from_predictions(predictions, true_values,
         labels=list(range(0, 9)))
