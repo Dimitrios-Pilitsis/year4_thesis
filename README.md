@@ -12,4 +12,5 @@ The project is based on the following paper:
 >
 > [ExpBERT: Representation Engineering with Natural Language Explanations]
 
-
+The dataset is from:
+> Muhammad Imran, Prasenjit Mitra, Carlos Castillo: Twitter as a Lifeline: Human-annotated Twitter Corpora for NLP of Crisis-related Messages. In Proceedings of the 10th Language Resources and Evaluation Conference (LREC), pp. 1638-1643. May 2016, Portorož, Slovenia.
