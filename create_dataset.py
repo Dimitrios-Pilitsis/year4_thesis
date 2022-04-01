@@ -9,8 +9,6 @@ from datasets import load_dataset
 import demoji
 import emoji
 
-import seaborn as sns
-
 from visualizations import *
 
 # Important variables ------------------------------------------------------
@@ -201,8 +199,11 @@ def split_dataset(dataset_complete_filepath):
 
 # Main -------------------------------------------------------------
 def main():
-    visualizations_dataset(dataset_complete_noexp_filepath,
-        dataset_complete_exp_filepath)
+    #visualizations_dataset(dataset_complete_noexp_filepath,
+    #    dataset_complete_exp_filepath)
+
+    if not os.path.exists('plots'):
+        os.makedirs('plots')
 
     run_create_csv(directory_of_original_datasets, explanations_filepath,
         dataset_complete_noexp_filepath,dataset_complete_exp_filepath)
@@ -216,7 +217,9 @@ def main():
 
     data_noexp.save_to_disk("./dataset/crisis_dataset/noexp/")
     data_exp.save_to_disk("./dataset/crisis_dataset/exp/")
-
+    
+    visualizations_dataset(dataset_complete_noexp_filepath,
+        dataset_complete_exp_filepath)
 
 if __name__ == "__main__":
     main()
