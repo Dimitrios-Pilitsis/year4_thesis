@@ -152,15 +152,26 @@ def parse_args():
 
 
 # Summary writer helper functions --------------------------------------------
-def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs):
+def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
+    percent_dataset):
     """Get a unique directory that hasn't been logged to before for use with a TB
     SummaryWriter.
     """ 
     checkpoint = checkpoint.replace("-","_") 
     if exp_flag:
-        tb_log_dir_prefix = (f"Exp_{checkpoint}_epochs_{num_epochs}_run_")
+        tb_log_dir_prefix = (
+            f"Exp_{checkpoint}_" 
+            f"pd={percent_dataset}_" 
+            f"epochs={num_epochs}_" 
+            f"run_"
+            )
     else:
-        tb_log_dir_prefix = (f"NoExp_{checkpoint}_run_")
+        tb_log_dir_prefix = (
+            f"NoExp_{checkpoint}_"
+            f"pd={percent_dataset}_" 
+            f"epochs={num_epochs}_" 
+            f"run_"
+            )
 
     i = 0
     while i < 1000:
@@ -213,7 +224,7 @@ def main():
     )
 
     logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
-        args.checkpoint, args.num_epochs)
+        args.checkpoint, args.num_epochs, args.percent_dataset)
 
     #current run is the name used for all visualizations for a specific run
     current_run = logs_filepath.split("/")[-1]
@@ -253,7 +264,7 @@ def main():
     #Need to shift run number by -1 as latest model that has been trained is
     #current run - 1
     output_directory_save_model = get_filepath_numbered(Path(args.output_model),
-        args.exp_flag, args.checkpoint, args.num_epochs)
+        args.exp_flag, args.checkpoint, args.num_epochs, args.percent_dataset)
 
     #Model is set to evaluation mode by default using model.eval()
     #Using checkpoint is much quicker as model and tokenizer are cached by Huggingface
