@@ -329,7 +329,7 @@ def main():
             f"{decode_text(tokenizer, raw_datasets['train'][index]['text'],args.exp_flag)}.")
 
         logger.info(f"Input IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['input_ids']}.")
-        logger.info(f"Token type IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['token_type_ids']}.")
+        #logger.info(f"Token type IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['token_type_ids']}.")
 
    
     if args.tiny_dataset:
@@ -337,10 +337,6 @@ def main():
             args.seed)    
 
     tokenized_datasets.set_format("torch")
-
-    print(tokenized_datasets)
-    exit(0)
-
 
 
     # Dataloader --------------------------------------------------
