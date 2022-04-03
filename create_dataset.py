@@ -1,5 +1,6 @@
-import pandas as pd
+import argparse
 
+import pandas as pd
 import numpy as np
 
 import os
@@ -11,16 +12,59 @@ import emoji
 
 from visualizations import *
 
-# Important variables ------------------------------------------------------
-#TODO: make variables into arguments passed from calling program
+# argparser --------------------------------------------------------------
 
-example_filepath = "./dataset/CrisisNLP_labeled_data_crowdflower/2013_Pakistan_eq/2013_Pakistan_eq_CF_labeled_data.tsv"
-directory_of_original_datasets = "./dataset/CrisisNLP_labeled_data_crowdflower/"
-dataset_complete_noexp_filepath = "./dataset/dataset_complete_noexp.csv"
-dataset_complete_exp_filepath = "./dataset/dataset_complete_exp.csv"
 
-explanations_filepath = "./explanations.txt"
+def parse_args():
+    parser = argparse.ArgumentParser(description="Create dataset for NoExp or ExpBERT"+\
+    "model on natural disaster tweet classification task")
 
+    # Flags --------------------------------------------------------------
+    parser.add_argument(
+        '--explanations-filepath', 
+        type=str, 
+        default="explanations/explanations.txt", 
+        help="Specify location of explanations text file"
+    )
+    
+    parser.add_argument(
+        '--original-dataset-filepath', 
+        type=str, 
+        default="./dataset/CrisisNLP_labeled_data_crowdflower/", 
+        help="Specify location of original dataset"
+    )
+
+    parser.add_argument(
+        '--noexp-csv-filepath', 
+        type=str, 
+        default="./dataset/dataset_noexp.csv", 
+        help="Specify location of NoExp csv file"
+    )
+
+    parser.add_argument(
+        '--exp-csv-filepath', 
+        type=str, 
+        default="./dataset/dataset_exp.csv", 
+        help="Specify location of Exp csv file"
+    )
+
+    parser.add_argument(
+        '--output-noexp-directory', 
+        type=str, 
+        default="./dataset/crisis_dataset/noexp/", 
+        help="Specify location of NoExp Apache Arrow directory"
+    )
+
+    parser.add_argument(
+        '--output-exp-directory', 
+        type=str, 
+        default="./dataset/crisis_dataset/exp/", 
+        help="Specify location of Exp Apache Arrow directory"
+    )
+
+    args = parser.parse_args()
+
+    return args
 
 
 # Helper functions for inspecting data -------------------------------
@@ -190,8 +234,8 @@ def run_create_csv(directory_of_original_datasets, explanations_filepath, ds_noe
     
 
 # Split dataset into train:test
-def split_dataset(dataset_complete_filepath):
-    data = load_dataset("csv", data_files=dataset_complete_filepath)
+def split_dataset(dataset_filepath):
+    data = load_dataset("csv", data_files=dataset_filepath)
     data = data["train"].train_test_split(train_size=0.8,
         seed=42, shuffle=True)
     return data
@@ -199,27 +243,26 @@ def split_dataset(dataset_complete_filepath):
 
 # Main -------------------------------------------------------------
 def main():
-    #visualizations_dataset(dataset_complete_noexp_filepath,
-    #    dataset_complete_exp_filepath)
+    args = parse_args()
 
     if not os.path.exists('plots'):
         os.makedirs('plots')
 
-    run_create_csv(directory_of_original_datasets, explanations_filepath,
-        dataset_complete_noexp_filepath, dataset_complete_exp_filepath)
+    run_create_csv(args.original_dataset_filepath, args.explanations_filepath,
+        args.noexp_csv_filepath, args.exp_csv_filepath)
 
 
-    data_noexp = split_dataset(dataset_complete_noexp_filepath)
-    data_exp = split_dataset(dataset_complete_exp_filepath)
+    data_noexp = split_dataset(args.noexp_csv_filepath)
+    data_exp = split_dataset(args.exp_csv_filepath)
 
     # Check random points
     #print(data['train'].select(range(3))['text'])
 
-    data_noexp.save_to_disk("./dataset/crisis_dataset/noexp/")
-    data_exp.save_to_disk("./dataset/crisis_dataset/exp/")
+    data_noexp.save_to_disk(args.output_noexp_directory)
+    data_exp.save_to_disk(args.output_exp_directory)
     
-    visualizations_dataset(dataset_complete_noexp_filepath,
-        dataset_complete_exp_filepath)
+    visualizations_dataset(args.noexp_csv_filepath,
+        args.exp_csv_filepath)
 
 if __name__ == "__main__":
     main()

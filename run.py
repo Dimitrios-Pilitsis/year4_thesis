@@ -105,6 +105,20 @@ def parse_args():
         help="Location of where to save the model that will be trained."
     )
 
+    parser.add_argument(
+        "--noexp-dataset-filepath", 
+        type=str, 
+        default="./dataset/crisis_dataset/exp/", 
+        help="Location of Apache Arrow NoExp dataset."
+    )
+
+    parser.add_argument(
+        "--exp-dataset-filepath", 
+        type=str, 
+        default="./dataset/crisis_dataset/noexp/", 
+        help="Location of Apache Arrow Exp dataset."
+    )
+
     # Others ------------------------------------------------------------------
     parser.add_argument(
         "--checkpoint", 
@@ -301,9 +315,9 @@ def main():
 
     # Loading dataset ---------------------------------------------
     if args.exp_flag:
-        raw_datasets = load_from_disk("./dataset/crisis_dataset/exp/")
+        raw_datasets = load_from_disk(args.noexp_dataset_filepath)
     else:
-        raw_datasets = load_from_disk("./dataset/crisis_dataset/noexp/")
+        raw_datasets = load_from_disk(exp-dataset-filepath)
     
 
     if args.percent_dataset != 1.0:
