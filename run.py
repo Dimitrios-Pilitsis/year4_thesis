@@ -237,13 +237,19 @@ def main():
     if not os.path.exists('metrics'):
         os.makedirs('metrics')
 
-
     
     #current run is the name used for all visualizations for a specific run
     current_run = logs_filepath.split("/")[-1]
     current_run_number = int(current_run.split("_")[-1])
 
-    metrics_filepath = "./metrics/" + current_run
+    metrics_filepath = "./metrics/" + current_run + "/"
+    plots_filepath = "./plots/" + current_run + "/"
+
+    if not os.path.exists(metrics_filepath):
+        os.makedirs(metrics_filepath)
+
+    if not os.path.exists(plots_filepath):
+        os.makedirs(plots_filepath)
 
     summary_writer = SummaryWriter(str(logs_filepath), flush_secs=5)
 
@@ -421,12 +427,9 @@ def main():
         train_metrics = compute_metrics(accelerator, model, train_dataloader)
         train_metrics_list.append(train_metrics)
         logger.info(f"Epoch {epoch + 1} train results: {train_metrics}")
-        #summary_writer_train(summary_writer, train_metrics, epoch)
         summary_writer_metrics(summary_writer, train_metrics, epoch,
             train_flag=True)
-        #visualizations(summary_writer, accelerator, model, test_dataloader,
-        #    current_run, epoch)
-        #exit(0)
+        
         # Testing ----------------------------------------------------------------------
         logger.info(f"***** Running test set Epoch {epoch + 1}*****")
         test_metrics = compute_metrics(accelerator, model, test_dataloader)
@@ -437,16 +440,15 @@ def main():
          
         summary_writer_metrics(summary_writer, train_metrics, epoch,
             train_flag=False)
+
     # Plots for final model parameters ------------------------------------------------
-    
-    with open(metrics_filepath+'_train.p', 'wb') as fp:
+    with open(metrics_filepath+'/train.p', 'wb') as fp:
         pickle.dump(train_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
     
-    with open(metrics_filepath+'_test.p', 'wb') as fp:
+    with open(metrics_filepath+'/test.p', 'wb') as fp:
         pickle.dump(test_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
-    visualizations(summary_writer, accelerator, model, test_dataloader,
-        current_run, epoch)
+    visualizations(summary_writer, accelerator, model, test_dataloader, current_run, epoch)
 
 
     summary_writer.close()

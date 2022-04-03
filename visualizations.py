@@ -1,5 +1,6 @@
 import torch
 
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -117,7 +118,7 @@ def summary_writer_pr_curves(summary_writer, accelerator, model, dataloader, epo
 
 
 
-def create_roc_curves(accelerator, model, dataloader, current_run):
+def create_roc_curves(accelerator, model, dataloader, plots_filepath):
     predictions, labels = get_preds_and_labels(accelerator, model, dataloader)
 
     n_classes = 9
@@ -183,14 +184,13 @@ def create_roc_curves(accelerator, model, dataloader, current_run):
 
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
-    filepath = "./plots/" + current_run + "_roc_curve.png"
-
+    filepath = plots_filepath + "roc_curve.png"
     #bbox_inches=tight makes sure everything fits in the saved image (including
     #legend)
     plt.savefig(filepath, bbox_inches='tight')
 
 
-def create_pr_curves(accelerator, model, dataloader, current_run):
+def create_pr_curves(accelerator, model, dataloader, plots_filepath):
     predictions, labels = get_preds_and_labels(accelerator, model, dataloader)
 
     n_classes = 9
@@ -251,17 +251,14 @@ def create_pr_curves(accelerator, model, dataloader, current_run):
 
     plt.legend(handles=handles, labels=labels, loc="center left", bbox_to_anchor=(1, 0.5))
 
-    filepath = "./plots/" + current_run + "_pr_curve.png"
-
+    filepath = plots_filepath + "pr_curve.png"
     #bbox_inches=tight makes sure everything fits in the saved image (including
     #legend)
     plt.savefig(filepath, bbox_inches='tight')
 
 
 
-def create_confusion_matrix(accelerator, model, dataloader, current_run, epoch):
-
-    
+def create_confusion_matrix(accelerator, model, dataloader, plots_filepath):
     true_values = []
     predictions = []
     model.eval()
@@ -287,24 +284,317 @@ def create_confusion_matrix(accelerator, model, dataloader, current_run, epoch):
       
     plt.title("Confusion matrix")
 
-    filepath = "./plots/" + current_run + "_confusion_matrix.png"
+    filepath = plots_filepath + "confusion_matrix.png"
     plt.savefig(filepath, bbox_inches='tight')
-    #plt.show()
 
 
 
-
-
-
-
-def visualizations(summary_writer, accelerator, model, dataloader, current_run,
-    epoch):
+def metrics_plots(metrics_filepath, plots_filepath, current_run):
+    with open(metrics_filepath + 'train.p', 'rb') as fp:
+        metrics_train = pickle.load(fp)
     
+    with open(metrics_filepath + 'test.p', 'rb') as fp:
+        metrics_test = pickle.load(fp)
+
+    #Rearrange train and test metrics to be based on metric rather than epoch
+    accuracy_train = []
+    f1_weighted_train = []
+    precision_weighted_train = []
+    recall_weighted_train = []
+    f1_train = []
+    precision_train = []
+    recall_train = []
+
+    for val in metrics_train:
+        accuracy_train.append(val["accuracy"])
+        f1_weighted_train.append(val["f1_weighted"])
+        precision_weighted_train.append(val["precision_weighted"])
+        recall_weighted_train.append(val["recall_weighted"])
+        f1_train.append(val["f1"].reshape(9,-1))
+        precision_train.append(val["precision"].reshape(9,-1))
+        recall_train.append(val["recall"].reshape(9,-1))
+   
+
+    f1_train = np.squeeze(np.array(f1_train)).transpose()
+    precision_train = np.squeeze(np.array(precision_train)).transpose()
+    recall_train = np.squeeze(np.array(recall_train)).transpose()
+    
+    accuracy_test = []
+    f1_weighted_test = []
+    precision_weighted_test = []
+    recall_weighted_test = []
+    f1_test = []
+    precision_test = []
+    recall_test = []
+
+
+    for val in metrics_test:
+        accuracy_test.append(val["accuracy"])
+        f1_weighted_test.append(val["f1_weighted"])
+        precision_weighted_test.append(val["precision_weighted"])
+        recall_weighted_test.append(val["recall_weighted"])
+        f1_test.append(val["f1"].reshape(9,-1))
+        precision_test.append(val["precision"].reshape(9,-1))
+        recall_test.append(val["recall"].reshape(9,-1))
+   
+
+    f1_test = np.squeeze(np.array(f1_test)).transpose()
+    precision_test = np.squeeze(np.array(precision_test)).transpose()
+    recall_test = np.squeeze(np.array(recall_test)).transpose()
+
+
+    #Variables for plots
+    num_epochs = len(metrics_train)
+    n_classes = 9
+    epochs_graph = list(range(1, num_epochs+1))
+    colors = cycle(['black', 'gray', 'r', 'g', 'b', 'orange', 'purple', 'pink',
+        'm'])
+
+    #Accuracy plots ------------------------------------------------------
+    plt.figure()
+    
+    plt.plot(
+        epochs_graph,
+        accuracy_train,
+        color="b",
+        lw=3,
+        label="Train accuracy",
+    )
+    
+    plt.plot(
+        epochs_graph,
+        accuracy_test,
+        color="r",
+        lw=3,
+        label="Test accuracy",
+    )
+    
+    #plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("Epoch")
+    plt.ylabel("Percentage") 
+    plt.title("Accuracy")
+    plt.xticks(np.arange(1, num_epochs+1, 1))
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+    filepath = plots_filepath + "accuracy_curves.png"
+
+    #bbox_inches=tight makes sure everything fits in the saved image (including
+    #legend)
+    plt.savefig(filepath, bbox_inches='tight')
+
+    
+    #F1 per class train ------------------------------------------------------
+    plt.figure()
+    for i, color in zip(range(n_classes), colors):
+        plt.plot(
+            epochs_graph,
+            f1_train[i],
+            color=color,
+            lw=3,
+            label="F1 curve of class {0}".format(i),
+        )
+    
+    plt.plot(
+        epochs_graph,
+        f1_weighted_train,
+        color="gold",
+        lw=3,
+        label="F1 weighted macro",
+    )
+
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("Epoch")
+    plt.ylabel("F1 value") 
+    plt.title("F1 train")
+    plt.xticks(np.arange(1, num_epochs+1, 1))
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+    filepath = plots_filepath + "f1_train_curves.png"
+
+    plt.savefig(filepath, bbox_inches='tight')
+
+    #F1 per class test ------------------------------------------------------
+    plt.figure()
+    for i, color in zip(range(n_classes), colors):
+        plt.plot(
+            epochs_graph,
+            f1_test[i],
+            color=color,
+            lw=3,
+            label="F1 curve of class {0}".format(i),
+        )
+    
+    plt.plot(
+        epochs_graph,
+        f1_weighted_test,
+        color="gold",
+        lw=3,
+        label="F1 weighted macro",
+    )
+
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("Epoch")
+    plt.ylabel("F1 value") 
+    plt.title("F1 test")
+    plt.xticks(np.arange(1, num_epochs+1, 1))
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+    filepath = plots_filepath + "f1_test_curves.png"
+
+    plt.savefig(filepath, bbox_inches='tight')
+
+
+    #Precision per class train -------------------------------
+    plt.figure()
+
+    for i, color in zip(range(n_classes), colors):
+        plt.plot(
+            epochs_graph,
+            precision_train[i],
+            color=color,
+            lw=3,
+            label="Precision curve of class {0}".format(i),
+        )
+    
+    plt.plot(
+        epochs_graph,
+        precision_weighted_train,
+        color="gold",
+        lw=3,
+        label="Precision weighted macro",
+    )
+
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("Epoch")
+    plt.ylabel("Precision value") 
+    plt.title("Precision per class train")
+    plt.xticks(np.arange(1, num_epochs+1, 1))
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+    filepath = plots_filepath + "precision_train_curves.png"
+
+    plt.savefig(filepath, bbox_inches='tight')
+    
+    #Precision per class test -------------------------------
+    plt.figure()
+
+    for i, color in zip(range(n_classes), colors):
+        plt.plot(
+            epochs_graph,
+            precision_test[i],
+            color=color,
+            lw=3,
+            label="Precision curve of class {0}".format(i),
+        )
+    
+    plt.plot(
+        epochs_graph,
+        precision_weighted_test,
+        color="gold",
+        lw=3,
+        label="Precision weighted macro",
+    )
+
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("Epoch")
+    plt.ylabel("Precision value") 
+    plt.title("Precision per class test")
+    plt.xticks(np.arange(1, num_epochs+1, 1))
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+    filepath = plots_filepath + "precision_test_curves.png"
+
+    plt.savefig(filepath, bbox_inches='tight')
+
+    #Recall per class train -------------------------------------------
+    plt.figure()
+    
+    for i, color in zip(range(n_classes), colors):
+        plt.plot(
+            epochs_graph,
+            recall_train[i],
+            color=color,
+            lw=3,
+            label="Recall curve of class {0}".format(i),
+        )
+    
+    plt.plot(
+        epochs_graph,
+        recall_weighted_train,
+        color="gold",
+        lw=3,
+        label="Recall weighted macro",
+    )
+
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("Epoch")
+    plt.ylabel("Recall value") 
+    plt.title("Recall per class train")
+    plt.xticks(np.arange(1, num_epochs+1, 1))
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+    filepath = plots_filepath + "recall_train_curves.png"
+
+    plt.savefig(filepath, bbox_inches='tight')
+
+    #Recall per class test -------------------------------------------
+    plt.figure()
+    
+    for i, color in zip(range(n_classes), colors):
+        plt.plot(
+            epochs_graph,
+            recall_test[i],
+            color=color,
+            lw=3,
+            label="Recall curve of class {0}".format(i),
+        )
+    
+    plt.plot(
+        epochs_graph,
+        recall_weighted_test,
+        color="gold",
+        lw=3,
+        label="Recall weighted macro",
+    )
+
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("Epoch")
+    plt.ylabel("Recall value") 
+    plt.title("Recall per class test")
+    plt.xticks(np.arange(1, num_epochs+1, 1))
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+    filepath = plots_filepath + "recall_test_curves.png"
+
+    plt.savefig(filepath, bbox_inches='tight')
+
+
+
+
+def visualizations(summary_writer, accelerator, model, dataloader,
+    current_run, epoch):
+    
+    metrics_filepath = "./metrics/" + current_run + "/"
+    plots_filepath = "./plots/" + current_run + "/"
+
     summary_writer_pr_curves(summary_writer, accelerator, model, dataloader, epoch)
     
+    metrics_plots(metrics_filepath, plots_filepath, plots_filepath)
     # Individual visualizations
-    create_confusion_matrix(accelerator, model, dataloader, current_run, epoch)
+    create_confusion_matrix(accelerator, model, dataloader, plots_filepath)
 
-    create_roc_curves(accelerator, model, dataloader, current_run)
+    create_roc_curves(accelerator, model, dataloader, plots_filepath)
 
-    create_pr_curves(accelerator, model, dataloader, current_run)
+    create_pr_curves(accelerator, model, dataloader, plots_filepath)
+
+
+
+
+"""
+#To test visualizations without running run.py
+metrics_filepath = "./metrics/NoExp_bert_base_cased_pd=1.0_epochs=3_run_0"
+plots_filepath = "./plots/NoExp_bert_base_cased_pd=1.0_epochs=3_run_0"
+current_run = "NoExp_bert_base_cased_pd=1.0_epochs=3_run_0"
+metrics_plots(metrics_filepath, plots_filepath, current_run)
+"""
