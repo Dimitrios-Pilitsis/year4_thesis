@@ -8,6 +8,10 @@ import pandas as pd
 
 from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import PrecisionRecallDisplay
+from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import average_precision_score
+
 from itertools import cycle
 
 from accelerate import Accelerator
@@ -186,10 +190,77 @@ def create_roc_curves(accelerator, model, dataloader, current_run):
     plt.savefig(filepath, bbox_inches='tight')
 
 
+def create_pr_curves(accelerator, model, dataloader, current_run):
+    predictions, labels = get_preds_and_labels(accelerator, model, dataloader)
+
+    n_classes = 9
+
+    # Calculate precision, recall, average precision for each class
+    precision = dict()
+    recall = dict()
+    average_precision = dict()
+    for i in range(n_classes):
+        precision[i], recall[i], _ = precision_recall_curve(labels[i],
+            predictions[i], pos_label=1)
+   
+    #Deal with edge case where first value of recall is nan
+    for i in range(n_classes):
+        recall[i] = np.nan_to_num(recall[i], nan=1)
+
+        average_precision[i] = average_precision_score(labels[i],
+            predictions[i], pos_label=1)
+        
+        average_precision[i] = np.nan_to_num(average_precision[i], nan=0)
+
+
+    colors = cycle(['black', 'gray', 'r', 'g', 'b', 'orange', 'purple', 'pink',
+        'm'])
+
+    _, ax = plt.subplots()
+    
+    #iso-f1 curves
+    f_scores = np.linspace(0.2, 0.8, num=4)
+    for f_score in f_scores:
+        x = np.linspace(0.01, 1)
+        y = f_score * x / (2 * x - f_score)
+        (l,) = plt.plot(x[y >= 0], y[y >= 0], color="gray", alpha=0.2)
+        plt.annotate("f1={0:0.1f}".format(f_score), xy=(0.9, y[45] + 0.02))
+
+
+    #PR curves
+    for i, color in zip(range(n_classes), colors):
+        plt.plot(
+            recall[i],
+            precision[i],
+            color=color,
+            lw=3,
+            label="Precision Recall curve of class {0} (area = {1:0.2f})".format(i,
+                average_precision[i]),
+        )
+    
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+    plt.title("Precision recall plots")
+
+
+    handles, labels = ax.get_legend_handles_labels()
+    handles.extend([l])
+    labels.extend(["iso-f1 curves"])
+
+    plt.legend(handles=handles, labels=labels, loc="center left", bbox_to_anchor=(1, 0.5))
+
+    filepath = "./plots/" + current_run + "_pr_curve.png"
+
+    #bbox_inches=tight makes sure everything fits in the saved image (including
+    #legend)
+    plt.savefig(filepath, bbox_inches='tight')
 
 
 
 def create_confusion_matrix(accelerator, model, dataloader, current_run, epoch):
+
     
     true_values = []
     predictions = []
@@ -235,3 +306,5 @@ def visualizations(summary_writer, accelerator, model, dataloader, current_run,
     create_confusion_matrix(accelerator, model, dataloader, current_run, epoch)
 
     create_roc_curves(accelerator, model, dataloader, current_run)
+
+    create_pr_curves(accelerator, model, dataloader, current_run)
