@@ -3,6 +3,7 @@ import random
 import os
 from pathlib import Path
 import argparse
+import pickle
 
 import numpy as np
 
@@ -81,6 +82,13 @@ def parse_args():
         type=str, 
         default="logs", 
         help="Where to store the logs of the model."
+    )
+    
+    parser.add_argument(
+        "--output-metrics", 
+        type=str, 
+        default="metrics", 
+        help="Where to store the metrics of the model during training and testing."
     )
 
     parser.add_argument(
@@ -225,10 +233,17 @@ def main():
 
     logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
         args.checkpoint, args.num_epochs, args.percent_dataset)
+    
+    if not os.path.exists('metrics'):
+        os.makedirs('metrics')
 
+
+    
     #current run is the name used for all visualizations for a specific run
     current_run = logs_filepath.split("/")[-1]
     current_run_number = int(current_run.split("_")[-1])
+
+    metrics_filepath = "./metrics/" + current_run
 
     summary_writer = SummaryWriter(str(logs_filepath), flush_secs=5)
 
@@ -385,6 +400,10 @@ def main():
     logger.info(f"  Instantaneous batch size per device = {batch_size}")
     progress_bar = tqdm(range(num_training_steps), disable=not accelerator.is_local_main_process)
 
+    train_metrics_list = []
+    test_metrics_list = []
+
+
     for epoch in range(args.num_epochs):
         model.train()
         for batch in train_dataloader:
@@ -400,6 +419,7 @@ def main():
 
 
         train_metrics = compute_metrics(accelerator, model, train_dataloader)
+        train_metrics_list.append(train_metrics)
         logger.info(f"Epoch {epoch + 1} train results: {train_metrics}")
         #summary_writer_train(summary_writer, train_metrics, epoch)
         summary_writer_metrics(summary_writer, train_metrics, epoch,
@@ -410,6 +430,7 @@ def main():
         # Testing ----------------------------------------------------------------------
         logger.info(f"***** Running test set Epoch {epoch + 1}*****")
         test_metrics = compute_metrics(accelerator, model, test_dataloader)
+        test_metrics_list.append(test_metrics)
         logger.info(f"Epoch {epoch + 1} Test results: {test_metrics}")
         
         #summary_writer_test(summary_writer, test_metrics, epoch)
@@ -417,6 +438,13 @@ def main():
         summary_writer_metrics(summary_writer, train_metrics, epoch,
             train_flag=False)
     # Plots for final model parameters ------------------------------------------------
+    
+    with open(metrics_filepath+'_train.p', 'wb') as fp:
+        pickle.dump(train_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
+    
+    with open(metrics_filepath+'_test.p', 'wb') as fp:
+        pickle.dump(test_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
     visualizations(summary_writer, accelerator, model, test_dataloader,
         current_run, epoch)
 
