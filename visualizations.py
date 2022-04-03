@@ -337,7 +337,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
         precision_test.append(val["precision"].reshape(9,-1))
         recall_test.append(val["recall"].reshape(9,-1))
    
-
+    #Have matrix versions in the form num_classes x num_epochs
     f1_test = np.squeeze(np.array(f1_test)).transpose()
     precision_test = np.squeeze(np.array(precision_test)).transpose()
     recall_test = np.squeeze(np.array(recall_test)).transpose()

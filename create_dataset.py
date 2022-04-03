@@ -19,7 +19,17 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Create dataset for NoExp or ExpBERT"+\
     "model on natural disaster tweet classification task")
 
-    # Flags --------------------------------------------------------------
+
+    #Dataset sizing
+    parser.add_argument(
+        '--dataset-percent', 
+        type=float, 
+        default=1.0, 
+        help="Specify percentage of original dataset desired for Exp dataset."
+    )
+
+
+    # Directories and filepaths --------------------------------------------------------------
     parser.add_argument(
         '--explanations-filepath', 
         type=str, 
@@ -201,7 +211,7 @@ def check_for_duplicate_tweets(df):
 
 # Clean dataset functions -------------------------------------
 def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
-    ds_exp_fp):
+    ds_exp_fp, percent_dataset):
     dataframes = []
     filepaths = obtain_filepaths(directory_of_dataset)
     for filepath in filepaths:
@@ -220,6 +230,11 @@ def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
     #Get distributions and counts of labels
     #inspect_labels(df_total)
 
+    #Sample dataset if provided with argument
+    if percent_dataset != 1.0:
+        df_total = df_total.sample(frac=1).reset_index(drop=True) #Shuffle in place
+        df_total = df_total.head(int(len(df_total)*(percent_dataset))) #Get first percent of dataframe
+    
     explanations = read_explanations(explanations_filepath)
     df_exp = create_explanations_dataset(df_total, explanations)
 
@@ -227,17 +242,11 @@ def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
     df_exp.to_csv(ds_exp_fp, index=False)
 
 
-def run_create_csv(directory_of_original_datasets, explanations_filepath, ds_noexp_fp,
-    ds_exp_fp):
-    data_fusion(directory_of_original_datasets, explanations_filepath,
-        ds_noexp_fp, ds_exp_fp)
-    
-
 # Split dataset into train:test
 def split_dataset(dataset_filepath):
     data = load_dataset("csv", data_files=dataset_filepath)
     data = data["train"].train_test_split(train_size=0.8,
-        seed=42, shuffle=True)
+        shuffle=True)
     return data
 
 
@@ -248,8 +257,8 @@ def main():
     if not os.path.exists('plots'):
         os.makedirs('plots')
 
-    run_create_csv(args.original_dataset_filepath, args.explanations_filepath,
-        args.noexp_csv_filepath, args.exp_csv_filepath)
+    data_fusion(args.original_dataset_filepath, args.explanations_filepath,
+        args.noexp_csv_filepath, args.exp_csv_filepath, args.dataset_percent)
 
 
     data_noexp = split_dataset(args.noexp_csv_filepath)
