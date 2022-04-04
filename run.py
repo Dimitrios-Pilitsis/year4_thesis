@@ -140,7 +140,7 @@ def parse_args():
         default=1.0, 
         help="Percentage of the training data to use."
     )
-
+    
     parser.add_argument(
         "--seed", 
         type=int, 
@@ -171,11 +171,21 @@ def parse_args():
     return args
 
 
+# Helper functions ------------------------------------------------------------
+def get_explanation_type(exp_dataset_filepath):
+    if exp_dataset_filepath == "./dataset/crisis_dataset/noexp/":
+        explanation_type = "normal"
+    else:
+        #./dataset/crisis_dataset_few/exp/
+        filename = exp_dataset_filepath.split("/")
+        idx_explanation = [idx for idx, s in enumerate(filename) if 'crisis_dataset' in s][0]
+        explanation_type = filename[idx_explanation].split("_")[-1]
 
+    return explanation_type
 
 # Summary writer helper functions --------------------------------------------
 def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
-    percent_dataset):
+    percent_dataset, explanation_type):
     """Get a unique directory that hasn't been logged to before for use with a TB
     SummaryWriter.
     """ 
@@ -185,6 +195,7 @@ def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
             f"Exp_{checkpoint}_" 
             f"pd={percent_dataset}_" 
             f"epochs={num_epochs}_" 
+            f"explanations={explanation_type}_"
             f"run_"
             )
     else:
@@ -244,10 +255,16 @@ def main():
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO,
     )
+   
 
-    logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
-        args.checkpoint, args.num_epochs, args.percent_dataset)
+    #Find explanation type (normal, bad, few, many)
+    explanation_type = get_explanation_type(args.exp_dataset_filepath)
     
+    
+    logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
+        args.checkpoint, args.num_epochs, args.percent_dataset,
+        explanation_type)
+
     if not os.path.exists('metrics'):
         os.makedirs('metrics')
 
@@ -299,7 +316,8 @@ def main():
     #Need to shift run number by -1 as latest model that has been trained is
     #current run - 1
     output_directory_save_model = get_filepath_numbered(Path(args.output_model),
-        args.exp_flag, args.checkpoint, args.num_epochs, args.percent_dataset)
+        args.exp_flag, args.checkpoint, args.num_epochs, args.percent_dataset, 
+        explanation_type)
 
     #Model is set to evaluation mode by default using model.eval()
     #Using checkpoint is much quicker as model and tokenizer are cached by Huggingface
@@ -317,7 +335,7 @@ def main():
     if args.exp_flag:
         raw_datasets = load_from_disk(args.noexp_dataset_filepath)
     else:
-        raw_datasets = load_from_disk(exp-dataset-filepath)
+        raw_datasets = load_from_disk(args.exp_dataset_filepath)
     
 
     if args.percent_dataset != 1.0:

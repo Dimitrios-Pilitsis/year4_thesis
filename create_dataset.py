@@ -28,6 +28,11 @@ def parse_args():
         help="Specify percentage of original dataset desired for Exp dataset."
     )
 
+    parser.add_argument(
+        '--get-visualizations', 
+        action="store_true",
+        help="Specify whether you want to produce plots regarding the dataset."
+    )
 
     # Directories and filepaths --------------------------------------------------------------
     parser.add_argument(
