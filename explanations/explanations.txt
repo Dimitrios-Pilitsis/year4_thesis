@@ -1,36 +1,27 @@
-he is dead
-she is dead
-they are dead
-he is injured
-she is injured
-they are injured
-he is missing
-she is missing
-they are missing
-he is trapped
-she is trapped
-they are trapped
-he was found
-she was found 
-they were found
-he was rescued
-she was rescued 
-they were rescued
-people sent to shelter
-people were evacuated
-home was damaged
-heavily damaged
-no electricity
-no water
-no heating
-provide emergency relief
-people donate
-provide relief
-be careful
-warning issued
-being helpful
-prayers
-praying for citizens
-thoughts are with people
-help victims
-people getting help
+someone is dead
+someone is injured
+there are casualties
+someone is missing
+someone is trapped
+someone was found or rescued
+people were displaced
+people were sent to shelters
+people were evacuated and relocated
+there is significant damage
+there is no electricity
+water has been restored
+people are asking for donations
+people are offering to help
+people are volunteering
+people are being warned
+people are asked to be careful
+there are tips and guidance
+people are praying
+people are providing emotional support
+people are keeping others in their thoughts
+contains useful information
+helps to understand the situation
+is important
+no useful information
+irrelevant
+not related
