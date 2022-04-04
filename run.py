@@ -168,6 +168,8 @@ def parse_args():
     if args.eval and args.use_saved_model == False:
         raise ValueError("Can only evaluate a model that has been saved before.")
 
+   
+
     return args
 
 
@@ -220,7 +222,6 @@ def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
 # Tokenizer functions -------------------------------------------------
 
 def decode_text(tokenizer, text, exp_flag, *args):
-    print(exp_flag)
     if exp_flag:
         encoded_input = tokenizer(text, args[0]) #args[0]=explanations
     else:
@@ -260,10 +261,15 @@ def main():
     #Find explanation type (normal, bad, few, many)
     explanation_type = get_explanation_type(args.exp_dataset_filepath)
     
-    
-    logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
-        args.checkpoint, args.num_epochs, args.percent_dataset,
-        explanation_type)
+    if args.checkpoint == "cardiffnlp/twitter-roberta-base":
+        checkpoint = args.checkpoint.split("/")[-1]
+        logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
+            checkpoint, args.num_epochs, args.percent_dataset,
+            explanation_type)
+    else:
+        logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
+            args.checkpoint, args.num_epochs, args.percent_dataset,
+            explanation_type)
 
     if not os.path.exists('metrics'):
         os.makedirs('metrics')
