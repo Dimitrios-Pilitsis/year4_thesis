@@ -160,7 +160,7 @@ def create_roc_curves(accelerator, model, dataloader, plots_filepath):
         label="macro-average ROC curve (area = {0:0.2f})".format(roc_auc["macro"]),
         color="turquoise",
         linestyle=":",
-        linewidth=4,
+        linewidth=2,
     )
 
     colors = cycle(['black', 'gray', 'r', 'g', 'b', 'orange', 'purple', 'pink',
@@ -171,11 +171,11 @@ def create_roc_curves(accelerator, model, dataloader, plots_filepath):
             fpr[i],
             tpr[i],
             color=color,
-            lw=3,
+            lw=2,
             label="ROC curve of class {0} (area = {1:0.2f})".format(i, roc_auc[i]),
         )
 
-    plt.plot([0, 1], [0, 1], "k--", lw=3)
+    plt.plot([0, 1], [0, 1], "k--", lw=2)
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
     plt.xlabel("False Positive Rate")
@@ -233,7 +233,7 @@ def create_pr_curves(accelerator, model, dataloader, plots_filepath):
             recall[i],
             precision[i],
             color=color,
-            lw=3,
+            lw=2,
             label="Precision Recall curve of class {0} (area = {1:0.2f})".format(i,
                 average_precision[i]),
         )
@@ -357,7 +357,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
         epochs_graph,
         accuracy_train,
         color="b",
-        lw=3,
+        lw=2,
         label="Train accuracy",
     )
     
@@ -365,7 +365,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
         epochs_graph,
         accuracy_test,
         color="r",
-        lw=3,
+        lw=2,
         label="Test accuracy",
     )
     
@@ -391,7 +391,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
             epochs_graph,
             f1_train[i],
             color=color,
-            lw=3,
+            lw=2,
             label="F1 curve of class {0}".format(i),
         )
     
@@ -399,7 +399,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
         epochs_graph,
         f1_weighted_train,
         color="gold",
-        lw=3,
+        lw=2,
         label="F1 weighted macro",
     )
 
@@ -421,7 +421,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
             epochs_graph,
             f1_test[i],
             color=color,
-            lw=3,
+            lw=2,
             label="F1 curve of class {0}".format(i),
         )
     
@@ -429,7 +429,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
         epochs_graph,
         f1_weighted_test,
         color="gold",
-        lw=3,
+        lw=2,
         label="F1 weighted macro",
     )
 
@@ -453,7 +453,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
             epochs_graph,
             precision_train[i],
             color=color,
-            lw=3,
+            lw=2,
             label="Precision curve of class {0}".format(i),
         )
     
@@ -461,7 +461,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
         epochs_graph,
         precision_weighted_train,
         color="gold",
-        lw=3,
+        lw=2,
         label="Precision weighted macro",
     )
 
@@ -484,7 +484,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
             epochs_graph,
             precision_test[i],
             color=color,
-            lw=3,
+            lw=2,
             label="Precision curve of class {0}".format(i),
         )
     
@@ -492,7 +492,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
         epochs_graph,
         precision_weighted_test,
         color="gold",
-        lw=3,
+        lw=2,
         label="Precision weighted macro",
     )
 
@@ -515,7 +515,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
             epochs_graph,
             recall_train[i],
             color=color,
-            lw=3,
+            lw=2,
             label="Recall curve of class {0}".format(i),
         )
     
@@ -523,7 +523,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
         epochs_graph,
         recall_weighted_train,
         color="gold",
-        lw=3,
+        lw=2,
         label="Recall weighted macro",
     )
 
@@ -546,7 +546,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
             epochs_graph,
             recall_test[i],
             color=color,
-            lw=3,
+            lw=2,
             label="Recall curve of class {0}".format(i),
         )
     
@@ -554,7 +554,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
         epochs_graph,
         recall_weighted_test,
         color="gold",
-        lw=3,
+        lw=2,
         label="Recall weighted macro",
     )
 
@@ -590,11 +590,10 @@ def visualizations(summary_writer, accelerator, model, dataloader,
 
 
 
-
 """
 #To test visualizations without running run.py
-metrics_filepath = "./metrics/NoExp_bert_base_cased_pd=1.0_epochs=3_run_0"
-plots_filepath = "./plots/NoExp_bert_base_cased_pd=1.0_epochs=3_run_0"
+metrics_filepath = "./metrics/NoExp_bert_base_cased_pd=1.0_epochs=3_run_0/"
+plots_filepath = "./plots/NoExp_bert_base_cased_pd=1.0_epochs=3_run_0/"
 current_run = "NoExp_bert_base_cased_pd=1.0_epochs=3_run_0"
 metrics_plots(metrics_filepath, plots_filepath, current_run)
 """
