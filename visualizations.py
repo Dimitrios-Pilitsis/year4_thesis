@@ -163,7 +163,7 @@ def create_roc_curves(accelerator, model, dataloader, plots_filepath):
         linewidth=2,
     )
 
-    colors = cycle(['black', 'gray', 'r', 'g', 'b', 'orange', 'purple', 'pink',
+    colors = cycle(['yellow', 'gray', 'r', 'g', 'b', 'orange', 'purple', 'pink',
         'm'])
 
     for i, color in zip(range(n_classes), colors):
@@ -175,7 +175,7 @@ def create_roc_curves(accelerator, model, dataloader, plots_filepath):
             label="ROC curve of class {0} (area = {1:0.2f})".format(i, roc_auc[i]),
         )
 
-    plt.plot([0, 1], [0, 1], "k--", lw=2)
+    plt.plot([0, 1], [0, 1], "k--", color="black", lw=2)
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
     plt.xlabel("False Positive Rate")
@@ -242,7 +242,7 @@ def create_pr_curves(accelerator, model, dataloader, plots_filepath):
     plt.ylim([0.0, 1.05])
     plt.xlabel("Recall")
     plt.ylabel("Precision")
-    plt.title("Precision recall plots")
+    plt.title("Precision recall multiclass curves")
 
 
     handles, labels = ax.get_legend_handles_labels()
@@ -406,7 +406,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.ylim([0.0, 1.05])
     plt.xlabel("Epoch")
     plt.ylabel("F1 value") 
-    plt.title("F1 train")
+    plt.title("F1 per class of train dataset")
     plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
@@ -436,7 +436,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.ylim([0.0, 1.05])
     plt.xlabel("Epoch")
     plt.ylabel("F1 value") 
-    plt.title("F1 test")
+    plt.title("F1 per class of test dataset")
     plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
@@ -468,7 +468,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.ylim([0.0, 1.05])
     plt.xlabel("Epoch")
     plt.ylabel("Precision value") 
-    plt.title("Precision per class train")
+    plt.title("Precision per class of train dataset")
     plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
@@ -499,7 +499,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.ylim([0.0, 1.05])
     plt.xlabel("Epoch")
     plt.ylabel("Precision value") 
-    plt.title("Precision per class test")
+    plt.title("Precision per class of test dataset")
     plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
@@ -530,7 +530,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.ylim([0.0, 1.05])
     plt.xlabel("Epoch")
     plt.ylabel("Recall value") 
-    plt.title("Recall per class train")
+    plt.title("Recall per class of train dataset")
     plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
@@ -561,7 +561,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.ylim([0.0, 1.05])
     plt.xlabel("Epoch")
     plt.ylabel("Recall value") 
-    plt.title("Recall per class test")
+    plt.title("Recall per class of test dataset")
     plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
