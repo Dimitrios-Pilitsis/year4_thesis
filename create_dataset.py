@@ -235,7 +235,7 @@ def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
     #Get distributions and counts of labels
     #inspect_labels(df_total)
 
-    #Sample dataset if provided with argument
+    #Sample dataset if provided with percent dataset argument
     if percent_dataset != 1.0:
         df_total = df_total.sample(frac=1).reset_index(drop=True) #Shuffle in place
         df_total = df_total.head(int(len(df_total)*(percent_dataset))) #Get first percent of dataframe
@@ -244,7 +244,6 @@ def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
     
     explanations = read_explanations(explanations_filepath)
     df_exp = create_explanations_dataset(df_total, explanations)
-
     df_noexp.to_csv(ds_noexp_fp, index=False)
     df_exp.to_csv(ds_exp_fp, index=False)
 

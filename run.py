@@ -108,14 +108,14 @@ def parse_args():
     parser.add_argument(
         "--noexp-dataset-filepath", 
         type=str, 
-        default="./dataset/crisis_dataset/exp/", 
+        default="./dataset/crisis_dataset/noexp/", 
         help="Location of Apache Arrow NoExp dataset."
     )
 
     parser.add_argument(
         "--exp-dataset-filepath", 
         type=str, 
-        default="./dataset/crisis_dataset/noexp/", 
+        default="./dataset/crisis_dataset/exp/", 
         help="Location of Apache Arrow Exp dataset."
     )
 
@@ -339,10 +339,9 @@ def main():
 
     # Loading dataset ---------------------------------------------
     if args.exp_flag:
-        raw_datasets = load_from_disk(args.noexp_dataset_filepath)
-    else:
         raw_datasets = load_from_disk(args.exp_dataset_filepath)
-    
+    else:
+        raw_datasets = load_from_disk(args.noexp_dataset_filepath)
 
     if args.percent_dataset != 1.0:
         small_train_dataset = \
