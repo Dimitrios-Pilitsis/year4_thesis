@@ -52,12 +52,33 @@ def visualizations_dataset(noexp_fp, exp_fp):
     label_count_plot(exp_fp, True)
     label_count_plot(noexp_fp, False)
 
+# Get predictions and labels -------------------------------------------
 
-
-
-
-# Model metric visualizations ---------------------------------------------
 def get_preds_and_labels(accelerator, model, dataloader):
+    true_values = []
+    predictions = []
+    model.eval()
+
+    for batch in dataloader:
+        with torch.no_grad():
+            outputs = model(**batch)
+
+        logits = outputs.logits
+        prediction = torch.argmax(logits, dim=-1)
+        prediction = accelerator.gather(prediction).detach().cpu().numpy()
+        label = accelerator.gather(batch['labels']).detach().cpu().numpy()
+        true_values.append(label)
+        predictions.append(prediction)
+       
+    #Flattens array even when subarrays aren't of equal dimension (due to batch
+    # size)
+    true_values = np.hstack(true_values).astype(int)
+    predictions = np.hstack(predictions).astype(int)
+
+    return predictions, true_values
+
+
+def get_preds_and_labels_all_classes(accelerator, model, dataloader):
     labels = []
     predictions = []
     model.eval()
@@ -101,12 +122,12 @@ def get_preds_and_labels(accelerator, model, dataloader):
 
 
 
+# Visualizations -------------------------------------------------------------
 
 
-
-def summary_writer_pr_curves(summary_writer, accelerator, model, dataloader, epoch):
+def summary_writer_pr_curves(summary_writer, predictions, labels, epoch):
+#def summary_writer_pr_curves(summary_writer, accelerator, model, dataloader, epoch):
     
-    predictions, labels = get_preds_and_labels(accelerator, model, dataloader)
 
     l = list(range(0,9))
     # Create precision recall curves ----------------------------------
@@ -118,8 +139,7 @@ def summary_writer_pr_curves(summary_writer, accelerator, model, dataloader, epo
 
 
 
-def create_roc_curves(accelerator, model, dataloader, plots_filepath):
-    predictions, labels = get_preds_and_labels(accelerator, model, dataloader)
+def create_roc_curves(predictions, labels, plots_filepath):
 
     n_classes = 9
 
@@ -190,8 +210,7 @@ def create_roc_curves(accelerator, model, dataloader, plots_filepath):
     plt.savefig(filepath, bbox_inches='tight')
 
 
-def create_pr_curves(accelerator, model, dataloader, plots_filepath):
-    predictions, labels = get_preds_and_labels(accelerator, model, dataloader)
+def create_pr_curves(predictions, labels, plots_filepath):
 
     n_classes = 9
 
@@ -259,25 +278,8 @@ def create_pr_curves(accelerator, model, dataloader, plots_filepath):
 
 
 def create_confusion_matrix(accelerator, model, dataloader, plots_filepath):
-    true_values = []
-    predictions = []
-    model.eval()
-
-    for batch in dataloader:
-        with torch.no_grad():
-            outputs = model(**batch)
-
-        logits = outputs.logits
-        prediction = torch.argmax(logits, dim=-1)
-        prediction = accelerator.gather(prediction).detach().cpu().numpy()
-        label = accelerator.gather(batch['labels']).detach().cpu().numpy()
-        true_values.append(label)
-        predictions.append(prediction)
-       
-    #Flattens array even when subarrays aren't of equal dimension (due to batch
-    # size)
-    true_values = np.hstack(true_values).astype(int)
-    predictions = np.hstack(predictions).astype(int)
+    predictions, true_values = get_preds_and_labels(accelerator, model,
+        dataloader) 
 
     ConfusionMatrixDisplay.from_predictions(predictions, true_values,
         labels=list(range(0, 9)))
@@ -578,22 +580,25 @@ def visualizations(summary_writer, accelerator, model, dataloader,
     metrics_filepath = "./metrics/" + current_run + "/"
     plots_filepath = "./plots/" + current_run + "/"
 
-    summary_writer_pr_curves(summary_writer, accelerator, model, dataloader, epoch)
+    predictions, labels = get_preds_and_labels_all_classes(accelerator, model, dataloader)
+
+    summary_writer_pr_curves(summary_writer, predictions, labels, epoch)
     
     metrics_plots(metrics_filepath, plots_filepath, plots_filepath)
     # Individual visualizations
     create_confusion_matrix(accelerator, model, dataloader, plots_filepath)
 
-    create_roc_curves(accelerator, model, dataloader, plots_filepath)
+    create_roc_curves(predictions, labels, plots_filepath)
 
-    create_pr_curves(accelerator, model, dataloader, plots_filepath)
+    create_pr_curves(predictions, labels, plots_filepath)
 
 
 
 """
 #To test visualizations without running run.py
-metrics_filepath = "./metrics/NoExp_bert_base_cased_pd=1.0_epochs=3_run_0/"
-plots_filepath = "./plots/NoExp_bert_base_cased_pd=1.0_epochs=3_run_0/"
-current_run = "NoExp_bert_base_cased_pd=1.0_epochs=3_run_0"
+metrics_filepath = "./metrics/Exp_bert_base_cased_pd=1.0_epochs=3_explanations=normal_run_0/"
+plots_filepath = "./plots/Exp_bert_base_cased_pd=1.0_epochs=3_explanations=normal_run_0/"
+current_run = "Exp_bert_base_cased_pd=1.0_epochs=3_explanations=normal_run_0"
 metrics_plots(metrics_filepath, plots_filepath, current_run)
 """
+
