@@ -36,6 +36,45 @@ def label_count_plot(filepath, exp_flag):
     fig.savefig(filepath, bbox_inches='tight')
 
 
+def label_distribution_pie_chart(filepath):
+    df = pd.read_csv(filepath, header=0)
+    counts = df.groupby('labels').count()/len(df.index) #percentage of each label
+    sizes = (counts['text']*100).tolist()
+    labels = df.labels.unique()
+    
+    label_conversion = {
+        0 : 'injured_or_dead_people',
+        1 : 'missing_trapped_or_found_people',
+        2 : 'displaced_people_and_evacuations',
+        3 : 'infrastructure_and_utilities_damage',
+        4 : 'donation_needs_or_offers_or_volunteering_services',
+        5 : 'caution_and_advice',
+        6 : 'sympathy_and_emotional_support',
+        7 : 'other_useful_information',
+        8 : 'not_related_or_irrelevant',
+    }
+    
+    labels = [label_conversion[x] for x in labels]
+    #Make labels into phrases with spaces rather than underscore
+    labels = [label.replace("_", " ") for label in labels]
+    #Capitalize first letter of each label
+    labels = [label.capitalize() for label in labels]
+
+    colors = cycle(['deepskyblue', 'royalblue', 'indigo', 'gray', 'lightcoral', 
+        'brown', 'orange', 'g', 'm'])
+
+    plt.figure()
+    plt.pie(sizes, colors=colors)
+    labels = [f'{l}: {s:0.1f}%' for l, s in zip(labels, sizes)]
+
+    #plt.title("Distribution of labels of dataset")
+
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5), labels=labels)
+    filepath = "./plots/label_distribution_pie_chart.png"
+    plt.savefig(filepath, bbox_inches='tight')
+
+
+
 def label_distribution_plot(filepath):
     df = pd.read_csv(filepath, header=0)
     counts = df.groupby('labels').count()/len(df.index) #percentage of each label
@@ -601,4 +640,5 @@ plots_filepath = "./plots/Exp_bert_base_cased_pd=1.0_epochs=3_explanations=norma
 current_run = "Exp_bert_base_cased_pd=1.0_epochs=3_explanations=normal_run_0"
 metrics_plots(metrics_filepath, plots_filepath, current_run)
 """
-
+fp = "./dataset/dataset_noexp.csv"
+label_distribution_pie_chart(fp)
