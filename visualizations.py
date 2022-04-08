@@ -639,6 +639,6 @@ metrics_filepath = "./metrics/Exp_bert_base_cased_pd=1.0_epochs=3_explanations=n
 plots_filepath = "./plots/Exp_bert_base_cased_pd=1.0_epochs=3_explanations=normal_run_0/"
 current_run = "Exp_bert_base_cased_pd=1.0_epochs=3_explanations=normal_run_0"
 metrics_plots(metrics_filepath, plots_filepath, current_run)
-"""
 fp = "./dataset/dataset_noexp.csv"
 label_distribution_pie_chart(fp)
+"""
