@@ -344,17 +344,6 @@ def main():
     else:
         raw_datasets = load_from_disk(args.noexp_dataset_filepath)
 
-    if args.percent_dataset != 1.0:
-        small_train_dataset = \
-            raw_datasets["train"].train_test_split(train_size=args.percent_dataset,
-                seed=args.seed, shuffle=True)['train']
-        small_test_dataset = \
-            raw_datasets["test"].train_test_split(train_size=args.percent_dataset,
-                seed=args.seed, shuffle=True)['train']
-
-        raw_datasets = DatasetDict({"train": small_train_dataset, "test": small_test_dataset})
-
-
     # Log a few random samples from the training set:
     for index in random.sample(range(len(raw_datasets['train'])), 4):
         logger.info(f"Text of data point {index} of the training set sample: {raw_datasets['train'][index]['text']}.")
