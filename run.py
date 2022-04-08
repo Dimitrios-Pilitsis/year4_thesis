@@ -175,7 +175,8 @@ def parse_args():
 
 # Helper functions ------------------------------------------------------------
 def get_explanation_type(exp_dataset_filepath):
-    if exp_dataset_filepath == "./dataset/crisis_dataset/noexp/":
+    if exp_dataset_filepath == "./dataset/crisis_dataset/noexp/" or ("size" in
+        exp_dataset_filepath):
         explanation_type = "normal"
     else:
         #./dataset/crisis_dataset_few/exp/
