@@ -239,9 +239,9 @@ def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
     if percent_dataset != 1.0:
         df_total = df_total.sample(frac=1).reset_index(drop=True) #Shuffle in place
         df_total = df_total.head(int(len(df_total)*(percent_dataset))) #Get first percent of dataframe
-        df_noexp = df_total.sample(frac=1).reset_index(drop=True) #Shuffle in place
-        df_noexp = df_total.head(int(len(df_total)*(percent_dataset))) #Get first percent of dataframe
-    
+        df_noexp = df_noexp.sample(frac=1).reset_index(drop=True) #Shuffle in place
+        df_noexp = df_noexp.head(int(len(df_noexp)*(percent_dataset))) #Get first percent of dataframe
+
     explanations = read_explanations(explanations_filepath)
     df_exp = create_explanations_dataset(df_total, explanations)
     df_noexp.to_csv(ds_noexp_fp, index=False)
