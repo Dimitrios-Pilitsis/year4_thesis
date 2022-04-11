@@ -179,7 +179,7 @@ def get_explanation_type(exp_dataset_filepath):
         exp_dataset_filepath):
         explanation_type = "normal"
     else:
-        #./dataset/crisis_dataset_few/exp/
+        #e.g. ./dataset/crisis_dataset_few/exp/
         filename = exp_dataset_filepath.split("/")
         idx_explanation = [idx for idx, s in enumerate(filename) if 'crisis_dataset' in s][0]
         explanation_type = filename[idx_explanation].split("_")[-1]
@@ -402,8 +402,8 @@ def main():
 
     train_dataloader = DataLoader(tokenized_datasets['train'], shuffle=True, 
         batch_size=batch_size, collate_fn=data_collator)
-    test_dataloader = DataLoader(tokenized_datasets['test'], batch_size=batch_size, 
-        collate_fn=data_collator)
+    test_dataloader = DataLoader(tokenized_datasets['test'], shuffle=True,
+        batch_size=batch_size, collate_fn=data_collator)
 
 
     # Optimizer and learning rate scheduler -----------------------------

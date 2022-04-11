@@ -22,7 +22,7 @@ def parse_args():
 
     #Dataset sizing
     parser.add_argument(
-        '--dataset-percent', 
+        '--percent-dataset', 
         type=float, 
         default=1.0, 
         help="Specify percentage of original dataset desired for Exp dataset."
@@ -188,10 +188,13 @@ def create_explanations_dataset(df, explanations):
         'other_useful_information',
         'not related or irrelevant',
     ]
+    
     ex_td = textual_descriptions + explanations
     len_df = len(df.index)
+    #Create ex_td times each row
     df = pd.concat([df]*len(ex_td), ignore_index=True)
     ex_td = ex_td * len_df
+    #Add each explanation and textual description to each datapoint
     df.insert(1, "exp_and_td", ex_td, allow_duplicates = True)
     return df
 
@@ -231,6 +234,7 @@ def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
 
     #Check for duplicate tweets
     df_noexp = check_for_duplicate_tweets(df_total)
+    df_total.drop_duplicates(subset=['text'], inplace=True)
     
     #Get distributions and counts of labels
     #inspect_labels(df_total)
@@ -264,7 +268,7 @@ def main():
         os.makedirs('plots')
 
     data_fusion(args.original_dataset_filepath, args.explanations_filepath,
-        args.noexp_csv_filepath, args.exp_csv_filepath, args.dataset_percent)
+        args.noexp_csv_filepath, args.exp_csv_filepath, args.percent_dataset)
 
 
     data_noexp = split_dataset(args.noexp_csv_filepath)
