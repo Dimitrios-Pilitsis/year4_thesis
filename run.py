@@ -15,7 +15,7 @@ from torch.optim import AdamW
 from torch.utils.tensorboard import SummaryWriter
 
 import transformers
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModel
 from transformers import DataCollatorWithPadding
 from transformers import get_scheduler
 
@@ -330,11 +330,11 @@ def main():
     #Using checkpoint is much quicker as model and tokenizer are cached by Huggingface
     if args.use_saved_model:
         model = \
-        AutoModelForSequenceClassification.from_pretrained(args.saved_model_filepath,
+        AutoModel.from_pretrained(args.saved_model_filepath,
             num_labels=9)
         tokenizer = AutoTokenizer.from_pretrained(model_saved_filepath)
     else:
-        model = AutoModelForSequenceClassification.from_pretrained(args.checkpoint,
+        model = AutoModel.from_pretrained(args.checkpoint,
             num_labels=9)
         tokenizer = AutoTokenizer.from_pretrained(args.checkpoint)
 
@@ -343,151 +343,47 @@ def main():
         raw_datasets = load_from_disk(args.exp_dataset_filepath)
     else:
         raw_datasets = load_from_disk(args.noexp_dataset_filepath)
-        raw_datasets = raw_datasets["train"].train_test_split(train_size=0.8,
-            shuffle=True)
+        #raw_datasets = raw_datasets["train"].train_test_split(train_size=0.8,
+        #    shuffle=True)
+    
+    print(raw_datasets)
+    
+    # Get embeddings ------------------------------------------------------
+
+    #TODO: Make this section compatible with dataset percent
+    if args.tiny_dataset:
+        tokenized_train = tokenizer(raw_datasets['train']['text'][:15], truncation=True, padding=True, return_tensors='pt')
+    else:
+        tokenized_train = tokenizer(raw_datasets['train']['text'], truncation=True, padding=True, return_tensors='pt')
 
 
-    # Log a few random samples from the training set:
-    for index in random.sample(range(len(raw_datasets['train'])), 4):
-        logger.info(f"Text of data point {index} of the training set sample: {raw_datasets['train'][index]['text']}.")
-        logger.info(f"Explanation of data point {index} of the training set "
-                    f"example: {raw_datasets['train'][index]['exp_and_td']}.") if args.exp_flag else None
-        logger.info(f"Label of data point {index} of the training set sample: {raw_datasets['train'][index]['labels']}.")
-
-
-    # Tokenizers ----------------------------------------------------
-    #Is dataset specific
-    def tokenize_noexp_function(examples):
-        return tokenizer(examples["text"], truncation=True)
-
-
-    def tokenize_exp_function(examples):
-        return tokenizer(examples['text'], examples['exp_and_td'],
-            truncation=True)
+    train_ids = tokenized_train['input_ids']
+    model_outputs = model(train_ids)
+    
+    #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
+    output = model_outputs['last_hidden_state'] #0 is the CLS token
+    
+    #Obtain embeddings for all datapoints (num datapoints X 768)
+    #768 is the number of output neurons in final layer of BERT
+    embeddings = output[:,0,:]
+    print(embeddings.shape)
 
     if args.exp_flag:
-        tokenized_datasets = raw_datasets.map(tokenize_exp_function, batched=True)
-        tokenized_datasets = tokenized_datasets.remove_columns(["exp_and_td"])
-    else:
-        tokenized_datasets = raw_datasets.map(tokenize_noexp_function, batched=True)
+       #Want to convert (670760x768) into (18660x1x768)
+       #split, then restack
+       pass
 
 
-    #Remove columns that aren't strings here
-    tokenized_datasets = tokenized_datasets.remove_columns(["text"])
-    print(tokenized_datasets)
-
-    #Collator function for padding
-    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-
-    # Log a few random samples from the tokenized dataset:
-    for index in random.sample(range(len(tokenized_datasets['train'])), 4):
-
-        if args.exp_flag:
-            logger.info(f"Data point {index} of the tokenized training set sample: "
-            #f"{decode_text(tokenizer, raw_datasets['train'][index]['text'], {args.exp_flag}, raw_datasets['train'][index]['exp_and_td'])}.")
-            f"{decode_text(tokenizer, raw_datasets['train'][index]['text'], args.exp_flag, raw_datasets['train'][index]['exp_and_td'])}.")
-        else:
-            logger.info(f"Data point {index} of the tokenized training set sample: "
-            f"{decode_text(tokenizer, raw_datasets['train'][index]['text'],args.exp_flag)}.")
-
-        logger.info(f"Input IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['input_ids']}.")
-        #logger.info(f"Token type IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['token_type_ids']}.")
+    #TODO: concatenate the embeddings for classifier
+    #shape: (num_explanations + num textual_descriptions) x 768
+    
+    #Save embedding as pickle file 
+    #torch.save(embeddings, 'embeddings.pt')
+    
+    #To load the embeddings
+    #torch.load('tensors.pt')
 
    
-    if args.tiny_dataset:
-        tokenized_datasets = create_tiny_dataset(tokenized_datasets,
-            args.seed)    
-
-    tokenized_datasets.set_format("torch")
-
-
-    # Dataloader --------------------------------------------------
-
-    train_dataloader = DataLoader(tokenized_datasets['train'], shuffle=True, 
-        batch_size=batch_size, collate_fn=data_collator)
-    test_dataloader = DataLoader(tokenized_datasets['test'], shuffle=True,
-        batch_size=batch_size, collate_fn=data_collator)
-
-
-    # Optimizer and learning rate scheduler -----------------------------
-
-    optimizer = AdamW(model.parameters(), lr=5e-5)
-
-    train_dataloader, test_dataloader, model, optimizer = accelerator.prepare(
-        train_dataloader, test_dataloader, model, optimizer
-    )
-
-    num_training_steps = args.num_epochs * len(train_dataloader)
-
-    lr_scheduler = get_scheduler(
-        name="linear", 
-        optimizer=optimizer, 
-        num_warmup_steps=0,
-        num_training_steps=num_training_steps
-    )
-
-
-    #Training loop -------------------------------------------------------------
-
-    logger.info("***** Running training *****")
-    logger.info(f"  Num examples = {tokenized_datasets['train'].num_rows}")
-    logger.info(f"  Num Epochs = {args.num_epochs}")
-    logger.info(f"  Num training steps = {num_training_steps}")
-    logger.info(f"  Instantaneous batch size per device = {batch_size}")
-    progress_bar = tqdm(range(num_training_steps), disable=not accelerator.is_local_main_process)
-
-    train_metrics_list = []
-    test_metrics_list = []
-
-
-    for epoch in range(args.num_epochs):
-        model.train()
-        for batch in train_dataloader:
-            outputs = model(**batch)
-            loss = outputs.loss
-            accelerator.backward(loss)
-
-
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.zero_grad()
-            progress_bar.update(1)
-
-
-        train_metrics = compute_metrics(accelerator, model, train_dataloader)
-        train_metrics_list.append(train_metrics)
-        logger.info(f"Epoch {epoch + 1} train results: {train_metrics}")
-        summary_writer_metrics(summary_writer, train_metrics, epoch,
-            train_flag=True)
-        
-        # Testing ----------------------------------------------------------------------
-        logger.info(f"***** Running test set Epoch {epoch + 1}*****")
-        test_metrics = compute_metrics(accelerator, model, test_dataloader)
-        test_metrics_list.append(test_metrics)
-        logger.info(f"Epoch {epoch + 1} Test results: {test_metrics}")
-        
-        #summary_writer_test(summary_writer, test_metrics, epoch)
-         
-        summary_writer_metrics(summary_writer, train_metrics, epoch,
-            train_flag=False)
-
-    # Plots for final model parameters ------------------------------------------------
-    with open(metrics_filepath+'/train.p', 'wb') as fp:
-        pickle.dump(train_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
-    
-    with open(metrics_filepath+'/test.p', 'wb') as fp:
-        pickle.dump(test_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
-
-    visualizations(summary_writer, accelerator, model, test_dataloader, current_run, epoch)
-
-
-    summary_writer.close()
-    
-
-    # Save model and tokenizer---------------------------------------------
-    if args.save_model:
-        model.save_pretrained(output_directory_save_model)
-        tokenizer.save_pretrained(output_directory_save_model)
 
 
 if __name__ == "__main__":

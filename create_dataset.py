@@ -5,8 +5,7 @@ import numpy as np
 
 import os
 
-from datasets import load_dataset
-
+from datasets import load_dataset, load_from_disk
 import demoji
 import emoji
 
@@ -18,7 +17,12 @@ from visualizations import *
 def parse_args():
     parser = argparse.ArgumentParser(description="Create dataset for NoExp or ExpBERT"+\
     "model on natural disaster tweet classification task")
-
+    
+    parser.add_argument(
+        '--finetune', 
+        action="store_true",
+        help="Specify whether you want to produce the dataset used for finetuning."
+    )
 
     #Dataset sizing
     parser.add_argument(
@@ -189,10 +193,11 @@ def create_explanations_dataset(df, explanations):
         'not related or irrelevant',
     ]
     
-    ex_td = textual_descriptions + explanations
+    ex_td = explanations + textual_descriptions
     len_df = len(df.index)
     #Create ex_td times each row
-    df = pd.concat([df]*len(ex_td), ignore_index=True)
+    df = df.iloc[np.repeat(np.arange(len(df)), len(ex_td))].reset_index(drop=True) 
+
     ex_td = ex_td * len_df
     #Add each explanation and textual description to each datapoint
     df.insert(1, "exp_and_td", ex_td, allow_duplicates = True)
@@ -219,7 +224,7 @@ def check_for_duplicate_tweets(df):
 
 # Clean dataset functions -------------------------------------
 def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
-    ds_exp_fp, percent_dataset):
+    ds_exp_fp, percent_dataset, finetune):
     dataframes = []
     filepaths = obtain_filepaths(directory_of_dataset)
     for filepath in filepaths:
@@ -240,9 +245,7 @@ def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
     #inspect_labels(df_total)
 
     #Sample dataset if provided with percent dataset argument
-    if percent_dataset != 1.0:
-        df_total = df_total.sample(frac=1).reset_index(drop=True) #Shuffle in place
-        df_total = df_total.head(int(len(df_total)*(percent_dataset))) #Get first percent of dataframe
+    if finetune and percent_dataset != 1.0:
         df_noexp = df_noexp.sample(frac=1).reset_index(drop=True) #Shuffle in place
         df_noexp = df_noexp.head(int(len(df_noexp)*(percent_dataset))) #Get first percent of dataframe
 
@@ -250,14 +253,6 @@ def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
     df_exp = create_explanations_dataset(df_total, explanations)
     df_noexp.to_csv(ds_noexp_fp, index=False)
     df_exp.to_csv(ds_exp_fp, index=False)
-
-
-# Split dataset into train:test
-def split_dataset(dataset_filepath):
-    data = load_dataset("csv", data_files=dataset_filepath)
-    data = data["train"].train_test_split(train_size=0.8,
-        shuffle=True)
-    return data
 
 
 # Main -------------------------------------------------------------
@@ -268,15 +263,11 @@ def main():
         os.makedirs('plots')
 
     data_fusion(args.original_dataset_filepath, args.explanations_filepath,
-        args.noexp_csv_filepath, args.exp_csv_filepath, args.percent_dataset)
+        args.noexp_csv_filepath, args.exp_csv_filepath, args.percent_dataset, 
+        args.finetune)
 
-
-    data_noexp = split_dataset(args.noexp_csv_filepath)
-    data_exp = split_dataset(args.exp_csv_filepath)
-
-    # Check random points
-    #print(data['train'].select(range(3))['text'])
-
+    data_noexp = load_dataset("csv", data_files=args.noexp_csv_filepath)
+    data_exp = load_dataset("csv", data_files=args.exp_csv_filepath)
     data_noexp.save_to_disk(args.output_noexp_directory)
     data_exp.save_to_disk(args.output_exp_directory)
     
