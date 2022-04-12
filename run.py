@@ -347,15 +347,55 @@ def main():
         #    shuffle=True)
     
     print(raw_datasets)
+
+    # Embeddings NoExp ---------------------------------------------------
+
+    if args.exp_flag == False:
+        if args.tiny_dataset:
+            tokenized_train = tokenizer(raw_datasets['train']['text'][:10], truncation=True, padding=True, return_tensors='pt')
+        else:
+            tokenized_train = tokenizer(raw_datasets['train']['text'], truncation=True, padding=True, return_tensors='pt')
+
+        train_ids = tokenized_train['input_ids']
+        model_outputs = model(train_ids)
+        
+        #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
+        output = model_outputs['last_hidden_state'] #0 is the CLS token
+        
+        #Obtain embeddings for all datapoints (num datapoints * num_exp_td  X 768)
+        #768 is the number of output neurons in final layer of BERT
+        embeddings = output[:,0,:]
+        
+        #Shuffle datapoints
+        embeddings = embeddings[torch.randperm(embeddings.size()[0])]
+        print(embeddings.shape)
+        exit(0)
+        #torch.save(embeddings, 'noexp_embeddings.pt')
+   
+
+    # Variables for ExpBERT embeddings --------------------------------------------
+
+    dataset_size = raw_datasets.num_rows['train']
+    num_datapoints = 18660 #number of original daatapoints of crisis dataset
+    # number of explanations and textual descriptions
+    num_exp_td = dataset_size / num_datapoints 
     
-    # Get embeddings ------------------------------------------------------
+    #Confirm it is a float that can be converted to int without rounding
+    if num_exp_td % 1 != 0:
+        raise ValueError("Need to provide the correct dataset size")
+    
+    num_exp_td = int(num_exp_td)
+
+
+    # ExpBERT embeddings ------------------------------------------------------
 
     #TODO: Make this section compatible with dataset percent
     if args.tiny_dataset:
-        tokenized_train = tokenizer(raw_datasets['train']['text'][:15], truncation=True, padding=True, return_tensors='pt')
+        dataset_size = num_exp_td*3 #2 is just to keep dataset small
+        num_datapoints = int(dataset_size / num_exp_td)
+        tokenized_train = tokenizer(raw_datasets['train']['text'][:dataset_size], truncation=True, padding=True, return_tensors='pt')
     else:
         tokenized_train = tokenizer(raw_datasets['train']['text'], truncation=True, padding=True, return_tensors='pt')
-
 
     train_ids = tokenized_train['input_ids']
     model_outputs = model(train_ids)
@@ -363,27 +403,41 @@ def main():
     #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
     output = model_outputs['last_hidden_state'] #0 is the CLS token
     
-    #Obtain embeddings for all datapoints (num datapoints X 768)
+    #Obtain embeddings for all datapoints (num datapoints * num_exp_td X 768)
     #768 is the number of output neurons in final layer of BERT
     embeddings = output[:,0,:]
+
+    #shape: num_datapoints x (num_explanations + num textual_descriptions) x 768
+    embeddings = torch.reshape(embeddings, (num_datapoints, num_exp_td, 768))
+    
+    #Shuffle datapoints
+    embeddings = embeddings[torch.randperm(embeddings.size()[0])]
     print(embeddings.shape)
 
-    if args.exp_flag:
-       #Want to convert (670760x768) into (18660x1x768)
-       #split, then restack
-       pass
-
-
-    #TODO: concatenate the embeddings for classifier
-    #shape: (num_explanations + num textual_descriptions) x 768
-    
     #Save embedding as pickle file 
-    #torch.save(embeddings, 'embeddings.pt')
+    #torch.save(embeddings, 'exp_embeddings.pt')
+
+
+    #Deal with percent dataset sampling
+    if args.percent_dataset != 1.0:
+        #TODO: add perent dataset into vals so it is a subset
+        vals = torch.arange(0, embeddings.shape[0], dtype=float) #Tensor of
+        #indices in order to shuffle and get randomized points from embeddings
+        idx = torch.multinomial(vals, num_samples=vals.shape[0], replacement=False)
+        embeddings = embeddings[idx]
+        print(embeddings.shape)
+
     
     #To load the embeddings
     #torch.load('tensors.pt')
 
-   
+
+
+
+    # Classifier -------------------------------------------------------------
+    #Flatten tensors so that you have (num datapoints, num_exp_td x 768) 
+    embeddings = torch.flatten(embeddings, start_dim=1)
+    print(embeddings.shape)
 
 
 if __name__ == "__main__":
