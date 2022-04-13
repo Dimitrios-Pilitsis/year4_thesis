@@ -113,125 +113,19 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--log-frequency",
-        default=10,
-        type=int,
-        help="How frequently to save logs to tensorboard in number of steps",
-    )
-
-    parser.add_argument(
         "--print-frequency",
         default=10,
         type=int,
         help="How frequently to print progress to the command line in number of steps",
     )
 
-    # Specific to ADL ------------------------------------------
-
-
     args = parser.parse_args()
     return args
 
 
-# Shuffle and sample ----------------------------------------
-#Shuffle data
-def shuffle_data(embeddings, labels, percent_dataset):
-    vals = torch.arange(0, embeddings.shape[0], dtype=float) #Tensor of
-    #indices in order to shuffle and get randomized points from embeddings
-    idx = torch.multinomial(vals, num_samples=vals.shape[0], replacement=False)
-    embeddings = embeddings[idx]
-
-    #Shuffle labels
-    labels = np.array(labels).reshape((-1, 1))
-    idx_list = idx.tolist()
-    labels = labels[idx_list]
-
-    if percent_dataset != 1.0:
-        sample = int(embeddings.shape[0] * percent_dataset)
-        embeddings = embeddings[:sample,]
-    
-    return embeddings, labels
 
 
-# Arrange tensor into train and test -------------------------------
-
-def train_test_split(embeddings, labels):
-    with torch.no_grad():
-        train_split = int(0.7*embeddings.shape[0])
-        print("Train split")
-        print(train_split)
-        labels = labels.flatten()
-
-        train_embeddings = embeddings[:train_split].type(torch.float32)
-        test_embeddings = embeddings[train_split:].type(torch.float32)
-
-        train_labels = torch.tensor(labels[:train_split], dtype=torch.long)
-        test_labels = torch.tensor(labels[train_split:], dtype=torch.long)
-
-
-        features = {
-            'train': train_embeddings,
-            'test' : test_embeddings,
-        }
-        labels = {
-            'train': train_labels,
-            'test': test_labels,
-        }
-        """ 
-        train_loader = torch.utils.data.DataLoader(
-            train_dataset,
-            shuffle=True,
-            batch_size=args.batch_size,
-            pin_memory=True,
-            num_workers=args.worker_count,
-        )
-
-        test_loader = torch.utils.data.DataLoader(
-            test_dataset,
-            shuffle=False,
-            batch_size=args.batch_size,
-            num_workers=args.worker_count,
-            pin_memory=True,
-        )
-        """
-
-    return features, labels
-
-
-# Preprocess overall -------------------------------------
-def preprocess(exp_flag, exp_embeddings_filepath, noexp_embeddings_filepath,
-    exp_dataset_filepath, noexp_dataset_filepath, percent_dataset):
-
-    with torch.no_grad():
-        if exp_flag:
-            embeddings = torch.load(exp_embeddings_filepath)
-            raw_datasets = load_from_disk(exp_dataset_filepath)
-        else:
-            embeddings = torch.load(noexp_embeddings_filepath)
-            raw_datasets = load_from_disk(noexp_dataset_filepath)
-
-        labels = raw_datasets['train']['labels']
-
-        embeddings, labels = shuffle_data(embeddings, labels, percent_dataset)
-        features, labels = train_test_split(embeddings, labels)
-
-    return features, labels
-
-
-# Classifier helper functions --------------------------------
-def accuracy(probs: torch.FloatTensor, labels: torch.LongTensor) -> float:
-    """
-    Args:
-        probs: A float32 tensor of shape ``(batch_size, class_count)`` where each value 
-            at index ``i`` in a row represents the score of class ``i``.
-        targets: A long tensor of shape ``(batch_size,)`` containing the batch examples'
-            labels.
-    """
-    with torch.no_grad():
-        predicted = probs.argmax(dim=1)
-        assert len(labels) == len(predicted)
-        return float((labels == predicted).sum()) / len(labels)
-        
+# Accuracy -----------------------------------------------
 def compute_accuracy(
     labels: Union[torch.Tensor, np.ndarray], preds: Union[torch.Tensor, np.ndarray]
 ) -> float:
@@ -264,26 +158,24 @@ class MLP(nn.Module):
         return x
 
 # Trainer -----------------------------------------------
-
-
 class Trainer:
     def __init__(
         self,
         model: nn.Module,
-        #train_loader: DataLoader,
-        #val_loader: DataLoader,
-        features,
-        labels,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        #features,
+        #labels,
         criterion: nn.Module,
         optimizer: Optimizer,
         device: torch.device,
     ):
         self.model = model.to(device)
         self.device = device
-        #self.train_loader = train_loader
-        #self.val_loader = val_loader
-        self.features = features
-        self.labels = labels
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        #self.features = features
+        #self.labels = labels
         self.criterion = criterion
         self.optimizer = optimizer
         self.step = 0
@@ -293,29 +185,12 @@ class Trainer:
         epochs: int,
         val_frequency: int,
         print_frequency: int = 20,
-        log_frequency: int = 5,
         start_epoch: int = 0
     ):
         self.model.train()
 
         progress_bar = tqdm(range(epochs))
-        for epoch in range(0, epochs):
-            #logger.info(f"***** Running train set Epoch {epoch + 1}*****")
-            logits = self.model.forward(self.features['train']) #Forward pass of network
-            loss = self.criterion(logits, self.labels['train']) 
-            
-            print("epoch: {} train accuracy: {:2.2f}, loss: {:5.5f}".format(
-                epoch,
-                accuracy(logits, self.labels['train']) * 100,
-                loss.item()
-            ))
-            
-            loss.backward() #Compute backward pass, populates .grad attributes
-            self.optimizer.step() #Update model parameters using gradients
-            self.optimizer.zero_grad() #Zero out the .grad buffers
-            progress_bar.update(1)
 
-        """
         for epoch in range(start_epoch, epochs):
             self.model.train()
             data_load_start_time = time.time()
@@ -323,24 +198,18 @@ class Trainer:
                 batch = batch.to(self.device)
                 labels = labels.to(self.device)
                 data_load_end_time = time.time()
-
-                ## TASK 1: Compute the forward pass of the model, print the output shape
-                ##         and quit the program
-                #outputs = sself.model.forward(batch)
+                
                 logits = self.model.forward(batch)
                 print(logits.shape)
-                #import sys; sys.exit(1)
 
 
-                ## TASK 9: Compute the loss using self.criterion and
-                ##         store it in a variable called `loss`
                 loss = self.criterion(logits, labels)
 
-                ## TASK 10: Compute the backward pass
                 loss.backward()
-                ## TASK 12: Step the optimizer and then zero out the gradient buffers.
                 self.optimizer.step()
                 self.optimizer.zero_grad()
+
+                progress_bar.update(1)
 
                 with torch.no_grad():
                     preds = logits.argmax(-1)
@@ -348,8 +217,6 @@ class Trainer:
 
                 data_load_time = data_load_end_time - data_load_start_time
                 step_time = time.time() - data_load_end_time
-                if ((self.step + 1) % log_frequency) == 0:
-                    self.log_metrics(epoch, accuracy, loss, data_load_time, step_time)
                 if ((self.step + 1) % print_frequency) == 0:
                     self.print_metrics(epoch, accuracy, loss, data_load_time, step_time)
 
@@ -357,11 +224,9 @@ class Trainer:
                 data_load_start_time = time.time()
 
             if ((epoch + 1) % val_frequency) == 0:
-                self.validate()
-                # self.validate() will put the model in validation mode,
-                # so we have to switch back to train mode afterwards
-                self.model.train()
-        """
+                self.validate() #Run validation set
+                self.model.train() #Need to put model back into train mode
+
 
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
         epoch_step = self.step % len(self.train_loader)
@@ -374,14 +239,7 @@ class Trainer:
                 f"{data_load_time:.5f}, "
                 f"step time: {step_time:.5f}"
         )
-
-    def validate(self):
-        logger.info(f"***** Running test set *****")
-        logits = self.model.forward(self.features['test'])    
-        test_accuracy = accuracy(logits, self.labels['test']) * 100
-        print("test accuracy: {:2.2f}".format(test_accuracy))
- 
-    """
+   
     def validate(self):
         results = {"preds": [], "labels": []}
         total_loss = 0
@@ -405,7 +263,9 @@ class Trainer:
         average_loss = total_loss / len(self.val_loader)
 
         print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}")
-    """
+
+
+
 # Custom Dataset -----------------------------------------
 
 class Dataset(torch.utils.data.Dataset):
@@ -428,8 +288,7 @@ class Dataset(torch.utils.data.Dataset):
 
 #Data loader -------------------------------------------
 
-def get_data_loaders(args):
-
+def get_datasets(args):
     with torch.no_grad():
         if args.exp_flag:
             embeddings = torch.load(args.exp_embeddings_filepath)
@@ -440,69 +299,18 @@ def get_data_loaders(args):
 
         labels = raw_datasets['train']['labels']
 
-        #embeddings, labels = shuffle_data(embeddings, labels, percent_dataset)
-        #features, labels = train_test_split(embeddings, labels)
-        
         dataset = Dataset(embeddings, labels)
         #TRAIN TEST SPLIT
         train_test_split = 0.7
-
-        train_dataset, test_dataset = random_split(dataset, [int(train_test_split *
-        len(dataset)), int((1-train_test_split)*len(dataset))])
-
-        """
-        print(len(train_dataset))
-        #print(train_dataset[4])
-        print(train_dataset[12:36])
-        print((train_dataset[12:36][0].shape))
-        print(len(train_dataset[12:36][1]))
-        """
-
-        train_loader = DataLoader(
-            train_dataset,
-            shuffle=True,
-            batch_size=8,
-            num_workers=args.worker_count,
-            pin_memory=True,
-        )
-
-        test_loader = DataLoader(
-            test_dataset,
-            shuffle=True,
-            batch_size=8,
-            num_workers=args.worker_count,
-            pin_memory=True,
-        )
-
-        for i, batch in enumerate(train_loader):
-            print(i, batch)
-
-        for i, batch in enumerate(test_loader):
-            print(i, batch)
         
-
-
-
-
-    """
-        train_loader = DataLoader(
-            train_dataset,
-            shuffle=True,
-            batch_size=args.batch_size,
-            pin_memory=True,
-            num_workers=args.worker_count,
-        )
-
-        test_loader = DataLoader(
-            test_dataset,
-            shuffle=False,
-            batch_size=args.batch_size,
-            num_workers=args.worker_count,
-            pin_memory=True,
-        )
-        """
-
-    return train_loader, test_loader
+        tiny_dataset = True
+        if args.exp_flag and tiny_dataset:
+            train_dataset, test_dataset = random_split(dataset, [2,1])
+        else:
+            train_dataset, test_dataset = random_split(dataset, [int(train_test_split *
+            len(dataset)), int((1-train_test_split)*len(dataset))])
+    
+    return train_dataset, test_dataset
 
 
 # Main --------------------------------------------------
@@ -516,38 +324,43 @@ def main():
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO,
     )
-    """
-    train_loader, test_loader = get_data_loaders(args.exp_flag,
-        args.exp_embeddings_filepath, args.noexp_embeddings_filepath,
-        args.exp_dataset_filepath, args.noexp_dataset_filepath,
-        args.percent_dataset)
-        """
-    train_loader, test_loader = get_data_loaders(args)
-
-    exit(0)
-
-    features, labels = preprocess(args.exp_flag,
-        args.exp_embeddings_filepath, args.noexp_embeddings_filepath,
-        args.exp_dataset_filepath, args.noexp_dataset_filepath,
-        args.percent_dataset)
-   
-    print(features)
-    print(labels)
-    #exit(0)
-
     
+    train_dataset, test_dataset = get_datasets(args)
 
+    train_loader = DataLoader(
+        train_dataset,
+        shuffle=True,
+        batch_size=8,
+        num_workers=args.worker_count,
+        pin_memory=True,
+    )
 
+    test_loader = DataLoader(
+        test_dataset,
+        shuffle=True,
+        batch_size=8,
+        num_workers=args.worker_count,
+        pin_memory=True,
+    )
+    """
+    with torch.no_grad():
+        for i, batch in enumerate(train_loader):
+            print(i, batch)
+
+        for i, batch in enumerate(test_loader):
+            print(i, batch)
+    """
     torch.backends.cudnn.benchmark = True
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
-    
+
     #Feature count is the number of neurons from BERT
-    #768*(num explanations + num textual descriptions)
-    feature_count = features['train'][0].shape[0] 
+    #For NoExp we have 768 neurons from BERT
+    #For ExpBERT we have 768*(num explanations + num textual descriptions)
+    feature_count = train_dataset[0][0].shape[0]
     print(feature_count)
     hidden_layer_size = 100
     class_count = 9
@@ -565,15 +378,13 @@ def main():
     
 
     trainer = Trainer(
-        model, features, labels, criterion, optimizer, device
-        #model, train_loader, test_loader, criterion, optimizer, device
+        model, train_loader, test_loader, criterion, optimizer, device
     )
 
     trainer.train(
         args.num_epochs,
         args.val_frequency,
         print_frequency=args.print_frequency,
-        log_frequency=args.log_frequency,
     )
 
 

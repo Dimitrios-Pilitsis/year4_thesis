@@ -1,9 +1,6 @@
 import os
 from pathlib import Path
 import argparse
-import pickle
-
-import numpy as np
 
 from sklearn.metrics import ConfusionMatrixDisplay 
 
@@ -97,22 +94,23 @@ def main():
 
     if args.exp_flag is False:
         if args.tiny_dataset:
-            tokenized_train = tokenizer(raw_datasets['train']['text'][:100], truncation=True, padding=True, return_tensors='pt')
+            tokenized_train = tokenizer(raw_datasets['train']['text'][:10], truncation=True, padding=True, return_tensors='pt')
         else:
             tokenized_train = tokenizer(raw_datasets['train']['text'], truncation=True, padding=True, return_tensors='pt')
 
-        train_ids = tokenized_train['input_ids']
-        model_outputs = model(train_ids)
-        
-        #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
-        output = model_outputs['last_hidden_state'] 
-        
-        #0 of last hidden layer is the CLS token
-        embeddings = output[:, 0, :]
-        
-        print(embeddings.shape)
-        torch.save(embeddings, './embeddings/noexp_embeddings.pt')
-        exit(0)
+        with torch.no_grad():
+            train_ids = tokenized_train['input_ids']
+            model_outputs = model(train_ids)
+            
+            #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
+            output = model_outputs['last_hidden_state'] 
+            
+            #0 of last hidden layer is the CLS token
+            embeddings = output[:, 0, :]
+            
+            print(embeddings.shape)
+            torch.save(embeddings, './embeddings/noexp_embeddings.pt')
+            exit(0)
    
 
     # Variables for ExpBERT embeddings --------------------------------------------
@@ -131,7 +129,6 @@ def main():
 
     # ExpBERT embeddings ------------------------------------------------------
 
-    #TODO: Make this section compatible with dataset percent
     if args.tiny_dataset:
         dataset_size = num_exp_td*3 
         num_datapoints = int(dataset_size / num_exp_td)
@@ -140,24 +137,25 @@ def main():
         tokenized_train = tokenizer(raw_datasets['train']['text'], truncation=True, padding=True, return_tensors='pt')
     
 
-    train_ids = tokenized_train['input_ids']
-    model_outputs = model(train_ids)
-    
-    #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
-    output = model_outputs['last_hidden_state']
-    
-    #0 of last hidden layer is the CLS token
-    embeddings = output[:,0,:]
+    with torch.no_grad():
+        train_ids = tokenized_train['input_ids']
+        model_outputs = model(train_ids)
+        
+        #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
+        output = model_outputs['last_hidden_state']
+        
+        #0 of last hidden layer is the CLS token
+        embeddings = output[:,0,:]
+        
+        #shape becomes num_datapoints x (num_explanations + num textual_descriptions) x 768
+        embeddings = torch.reshape(embeddings, (num_datapoints, num_exp_td, 768))
+        
+        #Flatten tensors so that you have (num datapoints, num_exp_td x 768) 
+        embeddings = torch.flatten(embeddings, start_dim=1)
+        print(embeddings.shape)
 
-    #shape becomes num_datapoints x (num_explanations + num textual_descriptions) x 768
-    embeddings = torch.reshape(embeddings, (num_datapoints, num_exp_td, 768))
-    
-    #Flatten tensors so that you have (num datapoints, num_exp_td x 768) 
-    embeddings = torch.flatten(embeddings, start_dim=1)
-    print(embeddings.shape)
-
-    #Save embedding as pickle file 
-    torch.save(embeddings, './embeddings/exp_embeddings.pt')
+        #Save embedding as pickle file 
+        torch.save(embeddings, './embeddings/exp_embeddings.pt')
 
 
 if __name__ == "__main__":
