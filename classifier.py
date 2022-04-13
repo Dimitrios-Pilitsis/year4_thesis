@@ -7,6 +7,8 @@ from typing import Union, NamedTuple
 
 import torch
 import torch.backends.cudnn
+from torch.utils.data import DataLoader, random_split
+
 
 import numpy as np
 
@@ -66,12 +68,41 @@ def parse_args():
         default=1.0, 
         help="Percentage of the training data to use."
     )
-    
+
+    parser.add_argument(
+        "--learning-rate", 
+        default=1e-2, 
+        type=float, 
+        help="Learning rate"
+    )
+
+    parser.add_argument(
+        "--sgd-momentum", 
+        default=0.9, 
+        type=float, 
+        help="SGD Momentum"
+    )
+
     parser.add_argument(
         "--num-epochs", 
         type=int, 
         default=10, 
         help="Total number of epochs to perform during training."
+    )
+    
+    parser.add_argument(
+        "--batch-size",
+        default=128,
+        type=int,
+        help="Number of images within each mini-batch",
+    )
+
+    parser.add_argument(
+        "-j",
+        "--worker-count",
+        default=cpu_count(),
+        type=int,
+        help="Number of worker processes used to load data.",
     )
 
     parser.add_argument(
@@ -375,10 +406,103 @@ class Trainer:
 
         print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}")
     """
+# Custom Dataset -----------------------------------------
+
+class Dataset(torch.utils.data.Dataset):
+  'Characterizes a dataset for PyTorch'
+  def __init__(self, embeddings_IDs, labels):
+        'Initialization'
+        self.embeddings_IDs = embeddings_IDs
+        self.labels = labels
+
+  def __len__(self):
+        'Denotes the total number of samples'
+        return len(self.embeddings_IDs)
+
+  def __getitem__(self, index):
+        'Generates one sample of data'
+        # Select sample
+        return self.embeddings_IDs[index], self.labels[index]
+
+       
+
 #Data loader -------------------------------------------
 
-def get_data_loaders(embeddings, labels):
-    return 1
+def get_data_loaders(args):
+
+    with torch.no_grad():
+        if args.exp_flag:
+            embeddings = torch.load(args.exp_embeddings_filepath)
+            raw_datasets = load_from_disk(args.exp_dataset_filepath)
+        else:
+            embeddings = torch.load(args.noexp_embeddings_filepath)
+            raw_datasets = load_from_disk(args.noexp_dataset_filepath)
+
+        labels = raw_datasets['train']['labels']
+
+        #embeddings, labels = shuffle_data(embeddings, labels, percent_dataset)
+        #features, labels = train_test_split(embeddings, labels)
+        
+        dataset = Dataset(embeddings, labels)
+        #TRAIN TEST SPLIT
+        train_test_split = 0.7
+
+        train_dataset, test_dataset = random_split(dataset, [int(train_test_split *
+        len(dataset)), int((1-train_test_split)*len(dataset))])
+
+        """
+        print(len(train_dataset))
+        #print(train_dataset[4])
+        print(train_dataset[12:36])
+        print((train_dataset[12:36][0].shape))
+        print(len(train_dataset[12:36][1]))
+        """
+
+        train_loader = DataLoader(
+            train_dataset,
+            shuffle=True,
+            batch_size=8,
+            num_workers=args.worker_count,
+            pin_memory=True,
+        )
+
+        test_loader = DataLoader(
+            test_dataset,
+            shuffle=True,
+            batch_size=8,
+            num_workers=args.worker_count,
+            pin_memory=True,
+        )
+
+        for i, batch in enumerate(train_loader):
+            print(i, batch)
+
+        for i, batch in enumerate(test_loader):
+            print(i, batch)
+        
+
+
+
+
+    """
+        train_loader = DataLoader(
+            train_dataset,
+            shuffle=True,
+            batch_size=args.batch_size,
+            pin_memory=True,
+            num_workers=args.worker_count,
+        )
+
+        test_loader = DataLoader(
+            test_dataset,
+            shuffle=False,
+            batch_size=args.batch_size,
+            num_workers=args.worker_count,
+            pin_memory=True,
+        )
+        """
+
+    return train_loader, test_loader
 
 
 # Main --------------------------------------------------
@@ -392,30 +516,26 @@ def main():
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO,
     )
-    
+    """
+    train_loader, test_loader = get_data_loaders(args.exp_flag,
+        args.exp_embeddings_filepath, args.noexp_embeddings_filepath,
+        args.exp_dataset_filepath, args.noexp_dataset_filepath,
+        args.percent_dataset)
+        """
+    train_loader, test_loader = get_data_loaders(args)
+
+    exit(0)
+
     features, labels = preprocess(args.exp_flag,
         args.exp_embeddings_filepath, args.noexp_embeddings_filepath,
         args.exp_dataset_filepath, args.noexp_dataset_filepath,
         args.percent_dataset)
+   
+    print(features)
+    print(labels)
+    #exit(0)
+
     
-
-    """
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset,
-        shuffle=True,
-        batch_size=args.batch_size,
-        pin_memory=True,
-        num_workers=args.worker_count,
-    )
-
-    test_loader = torch.utils.data.DataLoader(
-        test_dataset,
-        shuffle=False,
-        batch_size=args.batch_size,
-        num_workers=args.worker_count,
-        pin_memory=True,
-    )
-    """
 
 
     torch.backends.cudnn.benchmark = True
