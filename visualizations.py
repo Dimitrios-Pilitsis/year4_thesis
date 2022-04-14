@@ -316,10 +316,7 @@ def create_pr_curves(predictions, labels, plots_filepath):
 
 
 
-def create_confusion_matrix(accelerator, model, dataloader, plots_filepath):
-    predictions, true_values = get_preds_and_labels(accelerator, model,
-        dataloader) 
-
+def create_confusion_matrix(predictions, true_values, plots_filepath):
     ConfusionMatrixDisplay.from_predictions(predictions, true_values,
         labels=list(range(0, 9)))
       
@@ -621,11 +618,13 @@ def visualizations(summary_writer, accelerator, model, dataloader,
 
     predictions, labels = get_preds_and_labels_all_classes(accelerator, model, dataloader)
 
+    predictions_single, labels_single = get_preds_and_labels(accelerator, model, dataloader) 
+
     summary_writer_pr_curves(summary_writer, predictions, labels, epoch)
     
     metrics_plots(metrics_filepath, plots_filepath, plots_filepath)
     # Individual visualizations
-    create_confusion_matrix(accelerator, model, dataloader, plots_filepath)
+    create_confusion_matrix(predictions_single, labels_single, plots_filepath)
 
     create_roc_curves(predictions, labels, plots_filepath)
 

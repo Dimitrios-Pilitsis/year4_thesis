@@ -127,13 +127,6 @@ def parse_args():
     )
 
     parser.add_argument(
-    "--val-frequency",
-    default=2,
-    type=int,
-    help="How frequently to test the model on the validation set in number of epochs",
-    )
-
-    parser.add_argument(
         "--print-frequency",
         default=10,
         type=int,
@@ -197,7 +190,7 @@ class MLP_2h(nn.Module):
         x = self.l2(x)
         x = self.activation_fn(x)
         x = self.l3(x)
-        x = torch.nn.functional.softmax(x)
+        x = torch.nn.functional.softmax(x, dim=1)
         return x
 
 
@@ -222,7 +215,7 @@ class MLP_3h(nn.Module):
         x = self.l3(x)
         x = self.activation_fn(x)
         x = self.l4(x)
-        x = torch.nn.functional.softmax(x)
+        x = torch.nn.functional.softmax(x, dim=1)
         return x
 
 
@@ -233,8 +226,6 @@ class Trainer:
         model: nn.Module,
         train_loader: DataLoader,
         val_loader: DataLoader,
-        #features,
-        #labels,
         criterion: nn.Module,
         optimizer: Optimizer,
         device: torch.device,
@@ -243,8 +234,6 @@ class Trainer:
         self.device = device
         self.train_loader = train_loader
         self.val_loader = val_loader
-        #self.features = features
-        #self.labels = labels
         self.criterion = criterion
         self.optimizer = optimizer
         self.step = 0
@@ -252,23 +241,30 @@ class Trainer:
     def train(
         self,
         epochs: int,
-        val_frequency: int,
         print_frequency: int = 20,
         start_epoch: int = 0
     ):
         self.model.train()
 
         progress_bar = tqdm(range(epochs))
+        
+        train_metrics_list = []
+        test_metrics_list = []
+
 
         for epoch in range(start_epoch, epochs):
             self.model.train()
             data_load_start_time = time.time()
+
             for batch, labels in self.train_loader:
                 batch = batch.to(self.device)
                 labels = labels.to(self.device)
+
                 data_load_end_time = time.time()
                 
                 logits = self.model.forward(batch)
+                #TODO: Add logits for each epoch
+                #to a list, so that I can do train metrics
                 print(logits.shape)
 
 
@@ -291,11 +287,17 @@ class Trainer:
 
                 self.step += 1
                 data_load_start_time = time.time()
+            
 
-            if ((epoch + 1) % val_frequency) == 0:
-                self.validate() #Run validation set
-                self.model.train() #Need to put model back into train mode
+            #TODO: get train metrics here
 
+
+
+            #TODO: get validation metrics and append to val_metrics list 
+            self.validate() #Run validation set
+            self.model.train() #Need to put model back into train mode
+
+        #TODO: Save the arrays here
 
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
         epoch_step = self.step % len(self.train_loader)
@@ -311,6 +313,7 @@ class Trainer:
    
     def validate(self):
         results = {"preds": [], "labels": []}
+
         total_loss = 0
         self.model.eval()
 
@@ -329,9 +332,26 @@ class Trainer:
         accuracy = compute_accuracy(
             np.array(results["labels"]), np.array(results["preds"])
         )
+
+        #TODO: Add metrics here using sklearn
+        #precision, recall, f1 and their respective weighted version
+
+        """
+        results = {"accuracy": accuracy, 
+                "f1_weighted": f1_weighted,
+                "precision_weighted": precision_weighted,
+                "recall_weighted": recall_weighted,
+                "f1": f1,
+                "precision": precision,
+                "recall": recall
+            }
+        """
+
         average_loss = total_loss / len(self.val_loader)
 
         print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}")
+
+        #TODO: Return validation metrics here
 
 
 
@@ -473,14 +493,9 @@ def main():
 
     trainer.train(
         args.num_epochs,
-        args.val_frequency,
         print_frequency=args.print_frequency,
     )
-
-
-
-
-
+    
 
 
 
