@@ -70,6 +70,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--train-test-split", 
+        type=float, 
+        default=0.7, 
+        help="Percentage of splitting train and test sets."
+    )
+
+    parser.add_argument(
         "--num-hidden-layers", 
         default=1, 
         type=int, 
@@ -333,18 +340,24 @@ class Trainer:
 class Dataset(torch.utils.data.Dataset):
   'Characterizes a dataset for PyTorch'
   def __init__(self, embeddings_IDs, labels):
-        'Initialization'
         self.embeddings_IDs = embeddings_IDs
         self.labels = labels
 
   def __len__(self):
-        'Denotes the total number of samples'
         return len(self.embeddings_IDs)
 
   def __getitem__(self, index):
-        'Generates one sample of data'
-        # Select sample
-        return self.embeddings_IDs[index], self.labels[index]
+        #Return subset of embeddings and labels if provided with list
+        #of indices
+        if type(index) == list:
+            embeddings = []
+            labels = []
+            for val in index:
+                embeddings.append(self.embeddings_IDs[val])
+                labels.append(self.labels[val])
+            return embeddings, labels
+        else:
+            return self.embeddings_IDs[index], self.labels[index]
 
        
 
@@ -362,17 +375,29 @@ def get_datasets(args):
 
         dataset = Dataset(embeddings, labels)
         #TRAIN TEST SPLIT
-        train_test_split = 0.7
+
+        if args.percent_dataset != 1.0:
+            dataset_size = len(dataset)
+            dataset_indices = list(range(dataset_size))
+
+            np.random.shuffle(dataset_indices)
+            val_split_index = int(np.floor(args.percent_dataset * dataset_size))
+            dataset_idx  = dataset_indices[:val_split_index]
+
+            emb_subset, labels_subset = dataset[dataset_idx]
+            dataset = Dataset(emb_subset, labels_subset)
+
         
         #If the split results in equal values e.g. 70 and 30
-        if (train_test_split * len(dataset)) % 1 == 0:
-            train_size = int(train_test_split * len(dataset))
+        if (args.train_test_split * len(dataset)) % 1 == 0:
+            train_size = int(args.train_test_split * len(dataset))
             test_size = len(dataset) - train_size
             train_dataset, test_dataset = random_split(dataset, [train_size,
                 test_size])
         else: #unequal split e.g. 25.2 and 10.79
-            train_dataset, test_dataset = random_split(dataset, [int(floor(train_test_split *
-                len(dataset))), int(ceil((1-train_test_split)*len(dataset)))])
+            train_dataset, test_dataset = random_split(dataset,
+            [int(floor(args.train_test_split *
+                len(dataset))), int(ceil((1-args.train_test_split)*len(dataset)))])
 
 
     return train_dataset, test_dataset
@@ -408,14 +433,7 @@ def main():
         num_workers=args.worker_count,
         pin_memory=True,
     )
-    """
-    with torch.no_grad():
-        for i, batch in enumerate(train_loader):
-            print(i, batch)
-
-        for i, batch in enumerate(test_loader):
-            print(i, batch)
-    """
+    
     torch.backends.cudnn.benchmark = True
 
     if torch.cuda.is_available():
