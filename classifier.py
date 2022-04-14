@@ -70,6 +70,20 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--num-hidden-layers", 
+        default=1, 
+        type=int, 
+        help="Number of hidden layers to have in the classifer"
+    )
+
+    parser.add_argument(
+        "--hidden-layer-size", 
+        default=100, 
+        type=int, 
+        help="Number of neurons in a hidden layer"
+    )
+
+    parser.add_argument(
         "--learning-rate", 
         default=1e-2, 
         type=float, 
@@ -140,7 +154,7 @@ def compute_accuracy(
 
 
 # Classifier --------------------------------------------
-class MLP(nn.Module):
+class MLP_1h(nn.Module):
     def __init__(self,
                  input_size: int,
                  hidden_layer_size: int,
@@ -155,7 +169,55 @@ class MLP(nn.Module):
         x = self.l1(inputs)
         x = self.activation_fn(x)
         x = self.l2(x)
+        x = torch.nn.functional.softmax(x)
         return x
+
+class MLP_2h(nn.Module):
+    def __init__(self,
+                 input_size: int,
+                 hidden_layer_size: int,
+                 output_size: int,
+                 activation_fn: Callable[[torch.Tensor], torch.Tensor] = F.relu):
+        super().__init__()
+        self.l1 = nn.Linear(input_size, hidden_layer_size)
+        self.l2 = nn.Linear(hidden_layer_size, hidden_layer_size)
+        self.l3 = nn.Linear(hidden_layer_size, output_size)
+        self.activation_fn = activation_fn
+        
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        x = self.l1(inputs)
+        x = self.activation_fn(x)
+        x = self.l2(x)
+        x = self.activation_fn(x)
+        x = self.l3(x)
+        x = torch.nn.functional.softmax(x)
+        return x
+
+
+class MLP_3h(nn.Module):
+    def __init__(self,
+                 input_size: int,
+                 hidden_layer_size: int,
+                 output_size: int,
+                 activation_fn: Callable[[torch.Tensor], torch.Tensor] = F.relu):
+        super().__init__()
+        self.l1 = nn.Linear(input_size, hidden_layer_size)
+        self.l2 = nn.Linear(hidden_layer_size, hidden_layer_size)
+        self.l3 = nn.Linear(hidden_layer_size, hidden_layer_size)
+        self.l4 = nn.Linear(hidden_layer_size, output_size)
+        self.activation_fn = activation_fn
+        
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        x = self.l1(inputs)
+        x = self.activation_fn(x)
+        x = self.l2(x)
+        x = self.activation_fn(x)
+        x = self.l3(x)
+        x = self.activation_fn(x)
+        x = self.l4(x)
+        x = torch.nn.functional.softmax(x)
+        return x
+
 
 # Trainer -----------------------------------------------
 class Trainer:
@@ -361,12 +423,18 @@ def main():
     #For NoExp we have 768 neurons from BERT
     #For ExpBERT we have 768*(num explanations + num textual descriptions)
     feature_count = train_dataset[0][0].shape[0]
-    print(feature_count)
-    hidden_layer_size = 100
     class_count = 9
 
     # Define the model to optimze
-    model = MLP(feature_count, hidden_layer_size, class_count)
+    #model = MLP_1h(feature_count, hidden_layer_size, class_count)
+    
+    if args.num_hidden_layers == 1:
+        model = MLP_1h(feature_count, args.hidden_layer_size, class_count)
+    elif args.num_hidden_layers == 2:
+        model = MLP_2h(feature_count, args.hidden_layer_size, class_count)
+    else:
+        model = MLP_3h(feature_count, args.hidden_layer_size, class_count)
+
     model = model.to(device)
 
 
