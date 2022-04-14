@@ -363,12 +363,13 @@ def get_datasets(args):
         dataset = Dataset(embeddings, labels)
         #TRAIN TEST SPLIT
         train_test_split = 0.7
-        tiny_dataset = True
+        
         #If the split results in equal values e.g. 70 and 30
-        if train_test_split * len(dataset) % 1 == 0:
-            print("TRUEEEEEEEEEEEEEE")
-            train_dataset, test_dataset = random_split(dataset, [int(train_test_split *
-                len(dataset)), int(((1-train_test_split)*len(dataset)))])
+        if (train_test_split * len(dataset)) % 1 == 0:
+            train_size = int(train_test_split * len(dataset))
+            test_size = len(dataset) - train_size
+            train_dataset, test_dataset = random_split(dataset, [train_size,
+                test_size])
         else: #unequal split e.g. 25.2 and 10.79
             train_dataset, test_dataset = random_split(dataset, [int(floor(train_test_split *
                 len(dataset))), int(ceil((1-train_test_split)*len(dataset)))])
