@@ -1,6 +1,6 @@
 import argparse
 import logging
-
+from math import floor, ceil
 import time
 from multiprocessing import cpu_count
 from typing import Union, NamedTuple
@@ -8,7 +8,7 @@ from typing import Union, NamedTuple
 import torch
 import torch.backends.cudnn
 from torch.utils.data import DataLoader, random_split
-
+from torch.utils.data import SubsetRandomSampler
 
 import numpy as np
 
@@ -349,7 +349,6 @@ class Dataset(torch.utils.data.Dataset):
        
 
 #Data loader -------------------------------------------
-
 def get_datasets(args):
     with torch.no_grad():
         if args.exp_flag:
@@ -364,15 +363,19 @@ def get_datasets(args):
         dataset = Dataset(embeddings, labels)
         #TRAIN TEST SPLIT
         train_test_split = 0.7
-        
         tiny_dataset = True
-        if args.exp_flag and tiny_dataset:
-            train_dataset, test_dataset = random_split(dataset, [2,1])
-        else:
+        #If the split results in equal values e.g. 70 and 30
+        if train_test_split * len(dataset) % 1 == 0:
+            print("TRUEEEEEEEEEEEEEE")
             train_dataset, test_dataset = random_split(dataset, [int(train_test_split *
-            len(dataset)), int((1-train_test_split)*len(dataset))])
-    
+                len(dataset)), int(((1-train_test_split)*len(dataset)))])
+        else: #unequal split e.g. 25.2 and 10.79
+            train_dataset, test_dataset = random_split(dataset, [int(floor(train_test_split *
+                len(dataset))), int(ceil((1-train_test_split)*len(dataset)))])
+
+
     return train_dataset, test_dataset
+
 
 
 # Main --------------------------------------------------

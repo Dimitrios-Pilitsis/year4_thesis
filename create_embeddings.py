@@ -130,7 +130,7 @@ def main():
     # ExpBERT embeddings ------------------------------------------------------
 
     if args.tiny_dataset:
-        dataset_size = num_exp_td*3 
+        dataset_size = num_exp_td*5 
         num_datapoints = int(dataset_size / num_exp_td)
         tokenized_train = tokenizer(raw_datasets['train']['text'][:dataset_size], truncation=True, padding=True, return_tensors='pt')
     else:
