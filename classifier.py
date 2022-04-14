@@ -176,7 +176,7 @@ class MLP_1h(nn.Module):
         x = self.l1(inputs)
         x = self.activation_fn(x)
         x = self.l2(x)
-        x = torch.nn.functional.softmax(x)
+        x = torch.nn.functional.softmax(x, dim=1)
         return x
 
 class MLP_2h(nn.Module):
