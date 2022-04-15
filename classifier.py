@@ -22,7 +22,7 @@ from torch import optim
 from torch.optim.optimizer import Optimizer
 #import torchvision.datasets
 
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 from datasets import load_from_disk
 
@@ -188,9 +188,9 @@ def get_explanation_type(exp_dataset_filepath):
 def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
     percent_dataset, explanation_type):
     """Get a unique directory that hasn't been logged to before for use with a TB
-    SummaryWriter.
-    """ 
+    SummaryWriter."""
     checkpoint = checkpoint.replace("-","_") 
+    
     if exp_flag:
         tb_log_dir_prefix = (
             f"Exp_{checkpoint}_" 
@@ -206,6 +206,7 @@ def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
             f"epochs={num_epochs}_" 
             f"run_"
             )
+
 
     i = 0
     while i < 1000:
@@ -229,7 +230,42 @@ def compute_accuracy(
     assert len(labels) == len(preds)
     return float((labels == preds).sum()) / len(labels)
 
+def get_metrics(preds, y_trues):
+    """
+    accuracy = compute_accuracy(
+            np.array(y_trues), np.array(preds)
+    )
+    """
+    accuracy = accuracy_score(y_trues, preds)
 
+    precision = precision_score(y_trues, preds,
+        labels=list(range(9)), average=None, zero_division=0)
+
+    recall = recall_score(y_trues, preds,
+        labels=list(range(9)), average=None, zero_division=0)
+
+    f1 = f1_score(y_trues, preds,
+        labels=list(range(9)), average=None, zero_division=0)
+
+    precision_weighted = precision_score(y_trues, preds,
+        labels=list(range(9)), average="weighted", zero_division=0)
+
+    recall_weighted = recall_score(y_trues, preds,
+        labels=list(range(9)), average="weighted", zero_division=0)
+
+    f1_weighted = f1_score(y_trues, preds,
+        labels=list(range(9)), average="weighted", zero_division=0)
+
+    results = {"accuracy": accuracy, 
+            "f1_weighted": f1_weighted,
+            "precision_weighted": precision_weighted,
+            "recall_weighted": recall_weighted,
+            "f1": f1,
+            "precision": precision,
+            "recall": recall
+    }
+    
+    return results
 
 # Classifier --------------------------------------------
 class MLP_1h(nn.Module):
@@ -307,6 +343,7 @@ class Trainer:
         criterion: nn.Module,
         optimizer: Optimizer,
         device: torch.device,
+        metrics_filepath: str,
     ):
         self.model = model.to(device)
         self.device = device
@@ -314,6 +351,7 @@ class Trainer:
         self.val_loader = val_loader
         self.criterion = criterion
         self.optimizer = optimizer
+        self.metrics_filepath = metrics_filepath
         self.step = 0
 
     def train(
@@ -326,14 +364,15 @@ class Trainer:
 
         progress_bar = tqdm(range(epochs))
         
-        train_metrics_list = []
-        val_metrics_list = []
-
+        train_metrics_total = []
+        test_metrics_list = []
 
         for epoch in range(start_epoch, epochs):
             self.model.train()
             data_load_start_time = time.time()
-
+            train_logits = []
+            train_preds = []
+            train_labels = []
             for batch, labels in self.train_loader:
                 batch = batch.to(self.device)
                 labels = labels.to(self.device)
@@ -341,6 +380,9 @@ class Trainer:
                 data_load_end_time = time.time()
                 
                 logits = self.model.forward(batch)
+
+                train_logits.append(logits.detach().numpy())
+                train_labels.append(labels.detach().numpy())
                 #TODO: Add logits for each epoch
                 #to a list, so that I can do train metrics
                 print(logits.shape)
@@ -356,6 +398,7 @@ class Trainer:
 
                 with torch.no_grad():
                     preds = logits.argmax(-1)
+                    train_preds.append(preds.detach().numpy())
                     accuracy = compute_accuracy(labels, preds)
 
                 data_load_time = data_load_end_time - data_load_start_time
@@ -366,23 +409,30 @@ class Trainer:
                 self.step += 1
                 data_load_start_time = time.time()
             
-
-            #TODO: get train metrics here
-
-
-
+            #TODO: Deal with logits for PR, ROC
+            """
+            uneven_tensor = train_logits[-1]
+            train_l = torch.stack(train_logits[:-1], dim=1).reshape(-1,9)
+            print(train_l.shape)
+            train_logits = torch.cat((train_l, uneven_tensor))
+            """
+            train_preds = np.concatenate(train_preds).ravel()
+            train_labels = np.concatenate(train_labels).ravel()
+            train_results_epoch = get_metrics(train_preds, train_labels)
+            train_metrics_total.append(train_results_epoch)
+            print(train_results_epoch)
 
             #TODO: get validation metrics and append to val_metrics list 
-            val_results_epoch = self.validate() #Run validation set
-            val_metrics_list.append(val_results_epoch)
+            test_results_epoch = self.validate() #Run validation set
+            test_metrics_list.append(test_results_epoch)
             self.model.train() #Need to put model back into train mode
 
-        #TODO: Save the arrays here
-        print(len(val_metrics_list))
+        with open(self.metrics_filepath+'/train.p', 'wb') as fp:
+            pickle.dump(test_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(self.metrics_filepath+'/test.p', 'wb') as fp:
+            pickle.dump(test_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-        with open(metrics_filepath+'/train.p', 'wb') as fp:
-            pickle.dump(train_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
         epoch_step = self.step % len(self.train_loader)
@@ -414,41 +464,12 @@ class Trainer:
                 results["preds"].extend(list(preds))
                 results["labels"].extend(list(labels.cpu().numpy()))
 
-        accuracy = compute_accuracy(
-            np.array(results["labels"]), np.array(results["preds"])
-        )
-        
-
-        precision = precision_score(results["labels"], results["preds"],
-        labels=list(range(9)), average=None, zero_division=0)
-
-        recall = recall_score(results["labels"], results["preds"],
-                labels=list(range(9)), average=None, zero_division=0)
-
-        f1 = f1_score(results["labels"], results["preds"],
-                labels=list(range(9)), average=None, zero_division=0)
-
-        precision_weighted = precision_score(results["labels"], results["preds"],
-                labels=list(range(9)), average="weighted", zero_division=0)
-
-        recall_weighted = recall_score(results["labels"], results["preds"],
-                labels=list(range(9)), average="weighted", zero_division=0)
-
-        f1_weighted = f1_score(results["labels"], results["preds"],
-                labels=list(range(9)), average="weighted", zero_division=0)
-
-        results = {"accuracy": accuracy, 
-                "f1_weighted": f1_weighted,
-                "precision_weighted": precision_weighted,
-                "recall_weighted": recall_weighted,
-                "f1": f1,
-                "precision": precision,
-                "recall": recall
-        }
+        results = get_metrics(results["labels"], results["preds"])
 
         average_loss = total_loss / len(self.val_loader)
 
-        print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}")
+        print(f"validation loss: {average_loss:.5f}")
+        print(results)
 
         return results
 
@@ -553,16 +574,16 @@ def main():
         os.makedirs('metrics')
 
 
-    print(logs_filepath)
-    exit(0)
-
-    
     #current run is the name used for all visualizations for a specific run
     current_run = logs_filepath.split("/")[-1]
     current_run_number = int(current_run.split("_")[-1])
 
+    logs_filepath = args.output_logs + "/" + current_run + "/"
     metrics_filepath = "./metrics/" + current_run + "/"
     plots_filepath = "./plots/" + current_run + "/"
+   
+    if not os.path.exists(logs_filepath):
+        os.makedirs(logs_filepath)
 
     if not os.path.exists(metrics_filepath):
         os.makedirs(metrics_filepath)
@@ -624,7 +645,8 @@ def main():
     
 
     trainer = Trainer(
-        model, train_loader, test_loader, criterion, optimizer, device
+        model, train_loader, test_loader, criterion, 
+            optimizer, device, metrics_filepath
     )
 
     trainer.train(
