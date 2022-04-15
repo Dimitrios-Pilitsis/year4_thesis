@@ -69,9 +69,25 @@ def parse_args():
     return args
 
 
+#Helper function -------------------------------------------------------
+def get_explanation_type(exp_dataset_filepath):
+    if exp_dataset_filepath == "./dataset/crisis_dataset/exp/" or ("size" in
+        exp_dataset_filepath):
+        explanation_type = "normal"
+    else:
+        #e.g. ./dataset/crisis_dataset_few/exp/
+        filename = exp_dataset_filepath.split("/")
+        idx_explanation = [idx for idx, s in enumerate(filename) if 'crisis_dataset' in s][0]
+        explanation_type = filename[idx_explanation].split("_")[-1]
+
+    return explanation_type
+
+
 # Main -------------------------------------------------------------------
 def main():
     args = parse_args()
+
+    explanation_type = get_explanation_type(args.exp_dataset_filepath)
 
     #Model is set to evaluation mode by default using model.eval()
     #Using checkpoint is much quicker as model and tokenizer are cached by Huggingface
@@ -155,7 +171,7 @@ def main():
         print(embeddings.shape)
 
         #Save embedding as pickle file 
-        torch.save(embeddings, './embeddings/exp_embeddings.pt')
+        torch.save(embeddings, f'./embeddings/exp_{explanation_type}_embeddings.pt')
 
 
 if __name__ == "__main__":

@@ -20,7 +20,6 @@ from torch.nn import functional as F
 from typing import Callable
 from torch import optim
 from torch.optim.optimizer import Optimizer
-#import torchvision.datasets
 
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
@@ -46,7 +45,7 @@ def parse_args():
     parser.add_argument(
         "--exp-embeddings-filepath", 
         type=str, 
-        default="./embeddings/exp_embeddings.pt", 
+        default="./embeddings/exp_normal_embeddings.pt", 
         help="Location of Apache Arrow Exp dataset."
     )
     
@@ -175,20 +174,10 @@ def parse_args():
 
 
 # Explanation helper functions ----------------------------------------------
-def get_explanation_type(exp_dataset_filepath):
-    if exp_dataset_filepath == "./dataset/crisis_dataset/noexp/" or ("size" in
-        exp_dataset_filepath):
-        explanation_type = "normal"
-    else:
-        #e.g. ./dataset/crisis_dataset_few/exp/
-        filename = exp_dataset_filepath.split("/")
-        idx_explanation = [idx for idx, s in enumerate(filename) if 'crisis_dataset' in s][0]
-        explanation_type = filename[idx_explanation].split("_")[-1]
 
-    return explanation_type
 
 def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
-    percent_dataset, explanation_type):
+    percent_dataset, explanation_type, num_hidden_layers):
     """Get a unique directory that hasn't been logged to before for use with a TB
     SummaryWriter."""
     checkpoint = checkpoint.replace("-","_") 
@@ -200,6 +189,7 @@ def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
             f"pd={percent_dataset}_" 
             f"epochs={num_epochs}_" 
             f"explanations={explanation_type}_"
+            f"hidden={num_hidden_layers}_"
             f"run_"
             )
     else:
@@ -207,6 +197,7 @@ def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
             f"NoExp_{checkpoint}_"
             f"pd={percent_dataset}_" 
             f"epochs={num_epochs}_" 
+            f"hidden={num_hidden_layers}_"
             f"run_"
             )
 
@@ -233,12 +224,7 @@ def compute_accuracy(
     assert len(labels) == len(preds)
     return float((labels == preds).sum()) / len(labels)
 
-def get_metrics(preds, y_trues):
-    """
-    accuracy = compute_accuracy(
-            np.array(y_trues), np.array(preds)
-    )
-    """
+def get_metrics(y_trues, preds):
     accuracy = accuracy_score(y_trues, preds)
 
     precision = precision_score(y_trues, preds,
@@ -370,7 +356,7 @@ class Trainer:
         progress_bar = tqdm(range(epochs))
         
         train_metrics_total = []
-        test_metrics_list = []
+        test_metrics_total = []
 
         for epoch in range(start_epoch, epochs):
             self.model.train()
@@ -388,10 +374,6 @@ class Trainer:
 
                 train_logits.append(logits.detach().numpy())
                 train_labels.append(labels.detach().numpy())
-                #TODO: Add logits for each epoch
-                #to a list, so that I can do train metrics
-                print(logits.shape)
-
 
                 loss = self.criterion(logits, labels)
 
@@ -414,29 +396,23 @@ class Trainer:
                 self.step += 1
                 data_load_start_time = time.time()
             
-            #TODO: Deal with logits for PR, ROC
-            """
-            uneven_tensor = train_logits[-1]
-            train_l = torch.stack(train_logits[:-1], dim=1).reshape(-1,9)
-            print(train_l.shape)
-            train_logits = torch.cat((train_l, uneven_tensor))
-            """
+            
             train_preds = np.concatenate(train_preds).ravel()
             train_labels = np.concatenate(train_labels).ravel()
-            train_results_epoch = get_metrics(train_preds, train_labels)
+            train_results_epoch = get_metrics(train_labels, train_preds)
             train_metrics_total.append(train_results_epoch)
             print(train_results_epoch)
 
             #TODO: get validation metrics and append to val_metrics list 
             test_results_epoch = self.validate() #Run validation set
-            test_metrics_list.append(test_results_epoch)
+            test_metrics_total.append(test_results_epoch)
             self.model.train() #Need to put model back into train mode
         
         #Save metrics 
         with open(self.metrics_filepath+'/train.p', 'wb') as fp:
-            pickle.dump(test_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(train_metrics_total, fp, protocol=pickle.HIGHEST_PROTOCOL)
         with open(self.metrics_filepath+'/test.p', 'wb') as fp:
-            pickle.dump(test_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(test_metrics_total, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
         self.visualizations_model()
 
@@ -501,7 +477,6 @@ class Trainer:
                 train_results["preds"].extend(list(preds))
                 train_results["labels"].extend(list(labels.cpu().numpy()))
 
-        # No need to track gradients for validation, we're not optimizing.
         with torch.no_grad():
             for batch, labels in self.val_loader:
                 batch = batch.to(self.device)
@@ -513,12 +488,10 @@ class Trainer:
                 test_results["preds"].extend(list(preds))
                 test_results["labels"].extend(list(labels.cpu().numpy()))
 
-        #Convert predictions all and labels all to correct format
-
+        #Convert predictions to correct format
         predictions_all = np.vstack(train_results["preds_all"]).transpose()
-        print(predictions_all)
-
-
+        
+        #Convert labels into correct format
         labels_all = np.reshape(np.hstack(train_results["labels_all"]).astype(int), (1,-1))
         labels_all = np.repeat(labels_all, 9, axis=0)
         #predictions_a = np.hstack(predictions)
@@ -532,8 +505,6 @@ class Trainer:
             labels_all[idx] = np.where(labels_all[idx] == val, -1, 0)
             labels_all[idx] = np.where(labels_all[idx] == -1, 1, labels_all[idx])
 
-        print(labels_all)
-
         vis(test_results["preds"], test_results["labels"],
             predictions_all, labels_all, self.current_run)
 
@@ -544,7 +515,6 @@ class Trainer:
 # Custom Dataset -----------------------------------------
 
 class Dataset(torch.utils.data.Dataset):
-  'Characterizes a dataset for PyTorch'
   def __init__(self, embeddings_IDs, labels):
         self.embeddings_IDs = embeddings_IDs
         self.labels = labels
@@ -580,7 +550,6 @@ def get_datasets(args):
         labels = raw_datasets['train']['labels']
 
         dataset = Dataset(embeddings, labels)
-        #TRAIN TEST SPLIT
 
         if args.percent_dataset != 1.0:
             dataset_size = len(dataset)
@@ -623,17 +592,21 @@ def main():
     )
 
     #Find explanation type (normal, bad, few, many)
-    explanation_type = get_explanation_type(args.exp_dataset_filepath)
-    
+    if args.exp_flag:
+        explanation_type = args.exp_embeddings_filepath.split("_")[1]
+    else:
+        explanation_type = "none"
+
+
     if args.checkpoint == "cardiffnlp/twitter-roberta-base":
         checkpoint = args.checkpoint.split("/")[-1]
         logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
             checkpoint, args.num_epochs, args.percent_dataset,
-            explanation_type)
+            explanation_type, args.num_hidden_layers)
     else:
         logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
             args.checkpoint, args.num_epochs, args.percent_dataset,
-            explanation_type)
+            explanation_type, args.num_hidden_layers)
 
     if not os.path.exists('metrics'):
         os.makedirs('metrics')
