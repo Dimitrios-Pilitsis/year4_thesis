@@ -203,7 +203,7 @@ def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
             )
     else:
         tb_log_dir_prefix = (
-            f"NoExp_{checkpoint}_"
+            f"NoExpFinetune_{checkpoint}_"
             f"pd={percent_dataset}_" 
             f"epochs={num_epochs}_" 
             f"run_"

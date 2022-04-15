@@ -4,6 +4,9 @@ from math import floor, ceil
 import time
 from multiprocessing import cpu_count
 from typing import Union, NamedTuple
+import pickle
+from pathlib import Path
+import os
 
 import torch
 import torch.backends.cudnn
@@ -19,6 +22,8 @@ from torch import optim
 from torch.optim.optimizer import Optimizer
 #import torchvision.datasets
 
+from sklearn.metrics import precision_score, recall_score, f1_score
+
 from datasets import load_from_disk
 
 from tqdm.auto import tqdm
@@ -28,6 +33,7 @@ from tqdm.auto import tqdm
 def parse_args():
     parser = argparse.ArgumentParser(description="Run classifier")
 
+    # Filepaths ------------------------------------------
     parser.add_argument(
         "--noexp-embeddings-filepath", 
         type=str, 
@@ -57,6 +63,21 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--output-logs", 
+        type=str, 
+        default="logs", 
+        help="Where to store the logs of the model."
+    )
+    
+    parser.add_argument(
+        "--output-metrics", 
+        type=str, 
+        default="metrics", 
+        help="Where to store the metrics of the model during training and testing."
+    )
+    
+    #Flags and model variables -----------------------------
+    parser.add_argument(
         '--exp-flag', 
         action='store_true', 
         help="Run ExpBERT"
@@ -76,6 +97,8 @@ def parse_args():
         help="Percentage of splitting train and test sets."
     )
 
+
+    #Model hyperparameters -----------------------------------
     parser.add_argument(
         "--num-hidden-layers", 
         default=1, 
@@ -133,10 +156,65 @@ def parse_args():
         help="How frequently to print progress to the command line in number of steps",
     )
 
+    # Other -----------------------------------------------------
+    parser.add_argument(
+        "--checkpoint", 
+        type=str, 
+        default="bert-base-cased", 
+        help="Specify the checkpoint of your model e.g. bert-base-cased."
+    )
+
+    # ----------------------------------------------------------
+
     args = parser.parse_args()
     return args
 
 
+
+
+# Explanation helper functions ----------------------------------------------
+def get_explanation_type(exp_dataset_filepath):
+    if exp_dataset_filepath == "./dataset/crisis_dataset/noexp/" or ("size" in
+        exp_dataset_filepath):
+        explanation_type = "normal"
+    else:
+        #e.g. ./dataset/crisis_dataset_few/exp/
+        filename = exp_dataset_filepath.split("/")
+        idx_explanation = [idx for idx, s in enumerate(filename) if 'crisis_dataset' in s][0]
+        explanation_type = filename[idx_explanation].split("_")[-1]
+
+    return explanation_type
+
+def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
+    percent_dataset, explanation_type):
+    """Get a unique directory that hasn't been logged to before for use with a TB
+    SummaryWriter.
+    """ 
+    checkpoint = checkpoint.replace("-","_") 
+    if exp_flag:
+        tb_log_dir_prefix = (
+            f"Exp_{checkpoint}_" 
+            f"pd={percent_dataset}_" 
+            f"epochs={num_epochs}_" 
+            f"explanations={explanation_type}_"
+            f"run_"
+            )
+    else:
+        tb_log_dir_prefix = (
+            f"NoExp_{checkpoint}_"
+            f"pd={percent_dataset}_" 
+            f"epochs={num_epochs}_" 
+            f"run_"
+            )
+
+    i = 0
+    while i < 1000:
+        #Creates the PosixPath with run iteration appended
+        tb_log_dir = log_dir / (tb_log_dir_prefix + str(i))
+        if not tb_log_dir.exists():
+            return str(tb_log_dir)
+        i += 1
+    return str(tb_log_dir)
 
 
 # Accuracy -----------------------------------------------
@@ -249,7 +327,7 @@ class Trainer:
         progress_bar = tqdm(range(epochs))
         
         train_metrics_list = []
-        test_metrics_list = []
+        val_metrics_list = []
 
 
         for epoch in range(start_epoch, epochs):
@@ -293,11 +371,18 @@ class Trainer:
 
 
 
+
             #TODO: get validation metrics and append to val_metrics list 
-            self.validate() #Run validation set
+            val_results_epoch = self.validate() #Run validation set
+            val_metrics_list.append(val_results_epoch)
             self.model.train() #Need to put model back into train mode
 
         #TODO: Save the arrays here
+        print(len(val_metrics_list))
+
+
+        with open(metrics_filepath+'/train.p', 'wb') as fp:
+            pickle.dump(train_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
         epoch_step = self.step % len(self.train_loader)
@@ -332,11 +417,26 @@ class Trainer:
         accuracy = compute_accuracy(
             np.array(results["labels"]), np.array(results["preds"])
         )
+        
 
-        #TODO: Add metrics here using sklearn
-        #precision, recall, f1 and their respective weighted version
+        precision = precision_score(results["labels"], results["preds"],
+        labels=list(range(9)), average=None, zero_division=0)
 
-        """
+        recall = recall_score(results["labels"], results["preds"],
+                labels=list(range(9)), average=None, zero_division=0)
+
+        f1 = f1_score(results["labels"], results["preds"],
+                labels=list(range(9)), average=None, zero_division=0)
+
+        precision_weighted = precision_score(results["labels"], results["preds"],
+                labels=list(range(9)), average="weighted", zero_division=0)
+
+        recall_weighted = recall_score(results["labels"], results["preds"],
+                labels=list(range(9)), average="weighted", zero_division=0)
+
+        f1_weighted = f1_score(results["labels"], results["preds"],
+                labels=list(range(9)), average="weighted", zero_division=0)
+
         results = {"accuracy": accuracy, 
                 "f1_weighted": f1_weighted,
                 "precision_weighted": precision_weighted,
@@ -344,14 +444,14 @@ class Trainer:
                 "f1": f1,
                 "precision": precision,
                 "recall": recall
-            }
-        """
+        }
 
         average_loss = total_loss / len(self.val_loader)
 
         print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}")
 
-        #TODO: Return validation metrics here
+        return results
+
 
 
 
@@ -435,6 +535,42 @@ def main():
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO,
     )
+
+    #Find explanation type (normal, bad, few, many)
+    explanation_type = get_explanation_type(args.exp_dataset_filepath)
+    
+    if args.checkpoint == "cardiffnlp/twitter-roberta-base":
+        checkpoint = args.checkpoint.split("/")[-1]
+        logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
+            checkpoint, args.num_epochs, args.percent_dataset,
+            explanation_type)
+    else:
+        logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
+            args.checkpoint, args.num_epochs, args.percent_dataset,
+            explanation_type)
+
+    if not os.path.exists('metrics'):
+        os.makedirs('metrics')
+
+
+    print(logs_filepath)
+    exit(0)
+
+    
+    #current run is the name used for all visualizations for a specific run
+    current_run = logs_filepath.split("/")[-1]
+    current_run_number = int(current_run.split("_")[-1])
+
+    metrics_filepath = "./metrics/" + current_run + "/"
+    plots_filepath = "./plots/" + current_run + "/"
+
+    if not os.path.exists(metrics_filepath):
+        os.makedirs(metrics_filepath)
+
+    if not os.path.exists(plots_filepath):
+        os.makedirs(plots_filepath)
+
+
     
     train_dataset, test_dataset = get_datasets(args)
 
