@@ -28,6 +28,8 @@ from datasets import load_from_disk
 
 from tqdm.auto import tqdm
 
+from visualizations import *
+
 
 # Argparser --------------------------------------------------
 def parse_args():
@@ -190,6 +192,7 @@ def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
     """Get a unique directory that hasn't been logged to before for use with a TB
     SummaryWriter."""
     checkpoint = checkpoint.replace("-","_") 
+
     
     if exp_flag:
         tb_log_dir_prefix = (
@@ -344,6 +347,7 @@ class Trainer:
         optimizer: Optimizer,
         device: torch.device,
         metrics_filepath: str,
+        current_run: str,
     ):
         self.model = model.to(device)
         self.device = device
@@ -352,6 +356,7 @@ class Trainer:
         self.criterion = criterion
         self.optimizer = optimizer
         self.metrics_filepath = metrics_filepath
+        self.current_run = current_run
         self.step = 0
 
     def train(
@@ -426,12 +431,14 @@ class Trainer:
             test_results_epoch = self.validate() #Run validation set
             test_metrics_list.append(test_results_epoch)
             self.model.train() #Need to put model back into train mode
-
+        
+        #Save metrics 
         with open(self.metrics_filepath+'/train.p', 'wb') as fp:
             pickle.dump(test_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
         with open(self.metrics_filepath+'/test.p', 'wb') as fp:
             pickle.dump(test_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
+        self.visualizations_model()
 
 
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
@@ -472,6 +479,64 @@ class Trainer:
         print(results)
 
         return results
+    
+    #Visualizations of model
+    def visualizations_model(self):
+        train_results = {"preds": [], "labels": [], "preds_all": [],
+            "labels_all": []}
+        test_results = {"preds": [], "labels": [], "preds_all": [],
+            "labels_all": []}
+
+        total_loss = 0
+        self.model.eval()
+
+        with torch.no_grad():
+            for batch, labels in self.train_loader:
+                batch = batch.to(self.device)
+                labels = labels.to(self.device)
+                logits = self.model(batch)
+                train_results["preds_all"].append(logits.detach().numpy())
+                train_results["labels_all"].append(labels.detach().numpy())
+                preds = logits.argmax(dim=-1).cpu().numpy()
+                train_results["preds"].extend(list(preds))
+                train_results["labels"].extend(list(labels.cpu().numpy()))
+
+        # No need to track gradients for validation, we're not optimizing.
+        with torch.no_grad():
+            for batch, labels in self.val_loader:
+                batch = batch.to(self.device)
+                labels = labels.to(self.device)
+                logits = self.model(batch)
+                test_results["preds_all"].append(logits.detach().numpy())
+                test_results["labels_all"].append(labels.detach().numpy())
+                preds = logits.argmax(dim=-1).cpu().numpy()
+                test_results["preds"].extend(list(preds))
+                test_results["labels"].extend(list(labels.cpu().numpy()))
+
+        #Convert predictions all and labels all to correct format
+
+        predictions_all = np.vstack(train_results["preds_all"]).transpose()
+        print(predictions_all)
+
+
+        labels_all = np.reshape(np.hstack(train_results["labels_all"]).astype(int), (1,-1))
+        labels_all = np.repeat(labels_all, 9, axis=0)
+        #predictions_a = np.hstack(predictions)
+
+        l = list(range(0,9))
+        # Binarize labels to have 9 arrays, 1 for each label
+        # where for class i, the values where i is we have as 1, all other classes
+        # -1
+        for idx, val in enumerate(l):
+            #labels = np.where(labels == val, -1, labels)
+            labels_all[idx] = np.where(labels_all[idx] == val, -1, 0)
+            labels_all[idx] = np.where(labels_all[idx] == -1, 1, labels_all[idx])
+
+        print(labels_all)
+
+        vis(test_results["preds"], test_results["labels"],
+            predictions_all, labels_all, self.current_run)
+
 
 
 
@@ -646,7 +711,7 @@ def main():
 
     trainer = Trainer(
         model, train_loader, test_loader, criterion, 
-            optimizer, device, metrics_filepath
+            optimizer, device, metrics_filepath, current_run
     )
 
     trainer.train(
@@ -654,8 +719,7 @@ def main():
         print_frequency=args.print_frequency,
     )
     
-
-
+    
 
 if __name__ == "__main__":
     main()

@@ -608,8 +608,22 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.savefig(filepath, bbox_inches='tight')
 
 
+#Visualizations for NoExp and ExpBERT
+def vis(predictions, labels, predictions_all, labels_all, current_run):
+
+    metrics_filepath = "./metrics/" + current_run + "/"
+    plots_filepath = "./plots/" + current_run + "/"
+    
+    create_confusion_matrix(predictions, labels, plots_filepath)
+
+    metrics_plots(metrics_filepath, plots_filepath, current_run)
+    
+    create_roc_curves(predictions_all, labels_all, plots_filepath)
+
+    create_pr_curves(predictions_all, labels_all, plots_filepath)
 
 
+#Visualizations for NoExp finetuned
 def visualizations(summary_writer, accelerator, model, dataloader,
     current_run, epoch):
     
@@ -617,6 +631,11 @@ def visualizations(summary_writer, accelerator, model, dataloader,
     plots_filepath = "./plots/" + current_run + "/"
 
     predictions, labels = get_preds_and_labels_all_classes(accelerator, model, dataloader)
+
+    print(predictions)
+    print(labels)
+    print(len(predictions))
+    print(len(labels))
 
     predictions_single, labels_single = get_preds_and_labels(accelerator, model, dataloader) 
 
