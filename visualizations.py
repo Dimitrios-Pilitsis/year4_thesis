@@ -412,7 +412,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.xlabel("Epoch")
     plt.ylabel("Percentage") 
     plt.title("Accuracy")
-    plt.xticks(np.arange(1, num_epochs+1, 1))
+    #plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     filepath = plots_filepath + "accuracy_curves.png"
@@ -445,7 +445,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.xlabel("Epoch")
     plt.ylabel("F1 value") 
     plt.title("F1 per class of train dataset")
-    plt.xticks(np.arange(1, num_epochs+1, 1))
+    #plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     filepath = plots_filepath + "f1_train_curves.png"
@@ -475,7 +475,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.xlabel("Epoch")
     plt.ylabel("F1 value") 
     plt.title("F1 per class of test dataset")
-    plt.xticks(np.arange(1, num_epochs+1, 1))
+    #plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     filepath = plots_filepath + "f1_test_curves.png"
@@ -507,7 +507,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.xlabel("Epoch")
     plt.ylabel("Precision value") 
     plt.title("Precision per class of train dataset")
-    plt.xticks(np.arange(1, num_epochs+1, 1))
+    #plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     filepath = plots_filepath + "precision_train_curves.png"
@@ -538,7 +538,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.xlabel("Epoch")
     plt.ylabel("Precision value") 
     plt.title("Precision per class of test dataset")
-    plt.xticks(np.arange(1, num_epochs+1, 1))
+    #plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     filepath = plots_filepath + "precision_test_curves.png"
@@ -569,7 +569,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.xlabel("Epoch")
     plt.ylabel("Recall value") 
     plt.title("Recall per class of train dataset")
-    plt.xticks(np.arange(1, num_epochs+1, 1))
+    #plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     filepath = plots_filepath + "recall_train_curves.png"
@@ -600,7 +600,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
     plt.xlabel("Epoch")
     plt.ylabel("Recall value") 
     plt.title("Recall per class of test dataset")
-    plt.xticks(np.arange(1, num_epochs+1, 1))
+    #plt.xticks(np.arange(1, num_epochs+1, 1))
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     filepath = plots_filepath + "recall_test_curves.png"

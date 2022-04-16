@@ -505,6 +505,20 @@ class Trainer:
             labels_all[idx] = np.where(labels_all[idx] == val, -1, 0)
             labels_all[idx] = np.where(labels_all[idx] == -1, 1, labels_all[idx])
 
+
+        with open(self.metrics_filepath+'/test_preds.p', 'wb') as fp:
+            pickle.dump(test_results["preds"], fp, protocol=pickle.HIGHEST_PROTOCOL)
+        
+        with open(self.metrics_filepath+'/test_labels.p', 'wb') as fp:
+            pickle.dump(test_results["labels"], fp, protocol=pickle.HIGHEST_PROTOCOL)
+
+        with open(self.metrics_filepath+'/test_preds_all.p', 'wb') as fp:
+            pickle.dump(predictions_all, fp, protocol=pickle.HIGHEST_PROTOCOL)
+        
+        with open(self.metrics_filepath+'/test_labels_all.p', 'wb') as fp:
+            pickle.dump(labels_all, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
+
         vis(test_results["preds"], test_results["labels"],
             predictions_all, labels_all, self.current_run)
 
@@ -585,6 +599,7 @@ def get_datasets(args):
 def main():
     args = parse_args()
 
+    #Alter embeddings filepath for different checkpoints
     if args.checkpoint == "roberta-base":
         if args.exp_flag:
             args.exp_embeddings_filepath = \
