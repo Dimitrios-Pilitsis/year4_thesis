@@ -38,22 +38,22 @@ def parse_args():
     parser.add_argument(
         "--noexp-embeddings-filepath", 
         type=str, 
-        default="embeddings/noexp_embeddings.pt", 
+        default="embeddings/noexp_bert-base-cased_embeddings.pt", 
         help="Location of Apache Arrow NoExp dataset."
     )
 
     parser.add_argument(
         "--exp-embeddings-filepath", 
         type=str, 
-        default="./embeddings/exp_normal_embeddings.pt", 
-        help="Location of Apache Arrow Exp dataset."
+        default="./embeddings/exp_normal_bert-base-cased_embeddings.pt", 
+        help="Location of Exp embeddings torch file."
     )
     
     parser.add_argument(
         "--noexp-dataset-filepath", 
         type=str, 
         default="./dataset/crisis_dataset/noexp/", 
-        help="Location of Apache Arrow No Exp dataset."
+        help="Location of NoExp embeddings torch file."
     )  
 
     parser.add_argument(
@@ -396,7 +396,7 @@ class Trainer:
                 self.step += 1
                 data_load_start_time = time.time()
             
-            
+            #Arrange them to have correct shape 
             train_preds = np.concatenate(train_preds).ravel()
             train_labels = np.concatenate(train_labels).ravel()
             train_results_epoch = get_metrics(train_labels, train_preds)
@@ -546,7 +546,8 @@ def get_datasets(args):
         else:
             embeddings = torch.load(args.noexp_embeddings_filepath)
             raw_datasets = load_from_disk(args.noexp_dataset_filepath)
-
+        
+        #Train includes all datapoints at this point
         labels = raw_datasets['train']['labels']
 
         dataset = Dataset(embeddings, labels)
@@ -583,6 +584,21 @@ def get_datasets(args):
 
 def main():
     args = parse_args()
+
+    if args.checkpoint == "roberta-base":
+        if args.exp_flag:
+            args.exp_embeddings_filepath = \
+            "embeddings/exp_normal_roberta-base_embeddings.pt"
+        else:
+            args.noexp_embeddings_filepath = "embeddings/noexp_roberta-base_embeddings.pt"
+    elif args.checkpoint == "cardiffnlp/twitter-roberta-base":
+        if args.exp_flag:
+            args.exp_embeddings_filepath = \
+                "embeddings/exp_normal_twitter-roberta-base_embeddings.pt"
+        else:
+            args.noexp_embeddings_filepath = \
+                "embeddings/noexp_twitter-roberta-base_embeddings.pt"
+        
 
     logger = logging.getLogger(__name__)
     logging.basicConfig(

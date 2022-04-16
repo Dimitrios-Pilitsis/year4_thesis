@@ -52,13 +52,6 @@ def parse_args():
     # Other ---------------------------------------------------------------
 
     parser.add_argument(
-        "--percent-dataset", 
-        type=float, 
-        default=1.0, 
-        help="Percentage of the training data to use."
-    )
-   
-    parser.add_argument(
         "--checkpoint", 
         type=str, 
         default="bert-base-cased", 
@@ -108,9 +101,12 @@ def main():
     if not os.path.exists('embeddings'):
         os.makedirs('embeddings')
 
+    if args.checkpoint == "cardiffnlp/twitter-roberta-base":
+        args.checkpoint = "twitter-roberta-base"
+
     if args.exp_flag is False:
         if args.tiny_dataset:
-            tokenized_train = tokenizer(raw_datasets['train']['text'][:10], truncation=True, padding=True, return_tensors='pt')
+            tokenized_train = tokenizer(raw_datasets['train']['text'][:100], truncation=True, padding=True, return_tensors='pt')
         else:
             tokenized_train = tokenizer(raw_datasets['train']['text'], truncation=True, padding=True, return_tensors='pt')
 
@@ -124,8 +120,7 @@ def main():
             #0 of last hidden layer is the CLS token
             embeddings = output[:, 0, :]
             
-            print(embeddings.shape)
-            torch.save(embeddings, './embeddings/noexp_embeddings.pt')
+            torch.save(embeddings, f'./embeddings/noexp_{args.checkpoint}_embeddings.pt')
             exit(0)
    
 
@@ -168,10 +163,11 @@ def main():
         
         #Flatten tensors so that you have (num datapoints, num_exp_td x 768) 
         embeddings = torch.flatten(embeddings, start_dim=1)
-        print(embeddings.shape)
 
         #Save embedding as pickle file 
-        torch.save(embeddings, f'./embeddings/exp_{explanation_type}_embeddings.pt')
+
+        torch.save(embeddings,
+        f'./embeddings/exp_{explanation_type}_{args.checkpoint}_embeddings.pt')
 
 
 if __name__ == "__main__":
