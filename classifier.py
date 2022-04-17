@@ -372,8 +372,8 @@ class Trainer:
                 
                 logits = self.model.forward(batch)
 
-                train_logits.append(logits.detach().numpy())
-                train_labels.append(labels.detach().numpy())
+                train_logits.append(logits.cpu().numpy())
+                train_labels.append(labels.cpu().numpy())
 
                 loss = self.criterion(logits, labels)
 
@@ -385,7 +385,7 @@ class Trainer:
 
                 with torch.no_grad():
                     preds = logits.argmax(-1)
-                    train_preds.append(preds.detach().numpy())
+                    train_preds.append(preds.cpu().numpy())
                     accuracy = compute_accuracy(labels, preds)
 
                 data_load_time = data_load_end_time - data_load_start_time
@@ -471,8 +471,8 @@ class Trainer:
                 batch = batch.to(self.device)
                 labels = labels.to(self.device)
                 logits = self.model(batch)
-                train_results["preds_all"].append(logits.detach().numpy())
-                train_results["labels_all"].append(labels.detach().numpy())
+                train_results["preds_all"].append(logits.cpu().numpy())
+                train_results["labels_all"].append(labels.cpu().numpy())
                 preds = logits.argmax(dim=-1).cpu().numpy()
                 train_results["preds"].extend(list(preds))
                 train_results["labels"].extend(list(labels.cpu().numpy()))
@@ -482,8 +482,8 @@ class Trainer:
                 batch = batch.to(self.device)
                 labels = labels.to(self.device)
                 logits = self.model(batch)
-                test_results["preds_all"].append(logits.detach().numpy())
-                test_results["labels_all"].append(labels.detach().numpy())
+                test_results["preds_all"].append(logits.cpu().numpy())
+                test_results["labels_all"].append(labels.cpu().numpy())
                 preds = logits.argmax(dim=-1).cpu().numpy()
                 test_results["preds"].extend(list(preds))
                 test_results["labels"].extend(list(labels.cpu().numpy()))
