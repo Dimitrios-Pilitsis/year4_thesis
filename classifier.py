@@ -372,7 +372,7 @@ class Trainer:
                 
                 logits = self.model.forward(batch)
 
-                train_logits.append(logits.cpu().numpy())
+                train_logits.append(logits.detach().cpu().numpy())
                 train_labels.append(labels.cpu().numpy())
 
                 loss = self.criterion(logits, labels)
