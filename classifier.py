@@ -565,7 +565,7 @@ def get_datasets(args):
         labels = raw_datasets['train']['labels']
 
         dataset = Dataset(embeddings, labels)
-
+        """
         if args.percent_dataset != 1.0:
             dataset_size = len(dataset)
             dataset_indices = list(range(dataset_size))
@@ -576,7 +576,7 @@ def get_datasets(args):
 
             emb_subset, labels_subset = dataset[dataset_idx]
             dataset = Dataset(emb_subset, labels_subset)
-
+        """
         
         #If the split results in equal values e.g. 70 and 30
         if (args.train_test_split * len(dataset)) % 1 == 0:

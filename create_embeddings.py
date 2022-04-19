@@ -58,6 +58,13 @@ def parse_args():
         help="Specify the checkpoint of your model e.g. bert-base-cased."
     )
 
+    parser.add_argument(
+        "--percent-dataset", 
+        type=float, 
+        default=1.0, 
+        help="Percentage of the training data to use."
+    )
+
     args = parser.parse_args()
     return args
 
@@ -96,34 +103,6 @@ def main():
     
     print(raw_datasets)
 
-    # Embeddings NoExp ---------------------------------------------------
-
-    if not os.path.exists('embeddings'):
-        os.makedirs('embeddings')
-
-    if args.checkpoint == "cardiffnlp/twitter-roberta-base":
-        args.checkpoint = "twitter-roberta-base"
-
-    if args.exp_flag is False:
-        if args.tiny_dataset:
-            tokenized_train = tokenizer(raw_datasets['train']['text'][:100], truncation=True, padding=True, return_tensors='pt')
-        else:
-            tokenized_train = tokenizer(raw_datasets['train']['text'], truncation=True, padding=True, return_tensors='pt')
-
-        with torch.no_grad():
-            train_ids = tokenized_train['input_ids']
-            model_outputs = model(train_ids)
-            
-            #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
-            output = model_outputs['last_hidden_state'] 
-            
-            #0 of last hidden layer is the CLS token
-            embeddings = output[:, 0, :]
-            
-            torch.save(embeddings, f'./embeddings/noexp_{args.checkpoint}_embeddings.pt')
-            exit(0)
-   
-
     # Variables for ExpBERT embeddings --------------------------------------------
 
     dataset_size = raw_datasets.num_rows['train']
@@ -138,15 +117,50 @@ def main():
     num_exp_td = int(num_exp_td)
 
 
-    # ExpBERT embeddings ------------------------------------------------------
+
+    # Embeddings NoExp ---------------------------------------------------
+
+    if not os.path.exists('embeddings'):
+        os.makedirs('embeddings')
+
+    if args.checkpoint == "cardiffnlp/twitter-roberta-base":
+        args.checkpoint = "twitter-roberta-base"
+
+
+    
 
     if args.tiny_dataset:
-        dataset_size = num_exp_td*5 
-        num_datapoints = int(dataset_size / num_exp_td)
-        tokenized_train = tokenizer(raw_datasets['train']['text'][:dataset_size], truncation=True, padding=True, return_tensors='pt')
+        if args.exp_flag:
+            dataset_size = num_exp_td*5 
+            num_datapoints = int(dataset_size / num_exp_td)
+            tokenized_train = tokenizer(raw_datasets['train']['text'][:dataset_size], truncation=True, padding=True, return_tensors='pt')
+        else:
+            tokenized_train = tokenizer(raw_datasets['train']['text'][:100], truncation=True, padding=True, return_tensors='pt')
     else:
         tokenized_train = tokenizer(raw_datasets['train']['text'], truncation=True, padding=True, return_tensors='pt')
     
+
+
+
+
+    # NoExp ----------------------------------------------------------------
+
+    if args.exp_flag is False:
+        with torch.no_grad():
+            train_ids = tokenized_train['input_ids']
+            model_outputs = model(train_ids)
+            
+            #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
+            output = model_outputs['last_hidden_state'] 
+            
+            #0 of last hidden layer is the CLS token
+            embeddings = output[:, 0, :]
+            
+            torch.save(embeddings, f'./embeddings/noexp_{args.checkpoint}_embeddings.pt')
+            exit(0)
+   
+
+    # ExpBERT embeddings ------------------------------------------------------
 
     with torch.no_grad():
         train_ids = tokenized_train['input_ids']
@@ -157,13 +171,14 @@ def main():
         
         #Splits train_ids into tuple of Torch.Tensor
         
-        train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / 6))
-        print(train_ids_split[0].shape)
+        train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / 100))
     
         emb = [] 
         #Create embeddings by splitting train_ids
         for train_ids in train_ids_split:
             model_outputs = model(train_ids)
+            print(torch.max(model_outputs))
+            exit(0)
             #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
             output = model_outputs['last_hidden_state']
             #0 of last hidden layer is the CLS token

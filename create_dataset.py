@@ -17,13 +17,7 @@ from visualizations import *
 def parse_args():
     parser = argparse.ArgumentParser(description="Create dataset for NoExp or ExpBERT"+\
     "model on natural disaster tweet classification task")
-    
-    parser.add_argument(
-        '--finetune', 
-        action="store_true",
-        help="Specify whether you want to produce the dataset used for finetuning."
-    )
-
+ 
     #Dataset sizing
     parser.add_argument(
         '--percent-dataset', 
@@ -221,12 +215,10 @@ def check_for_duplicate_tweets(df):
     #duplicates = df[df.duplicated(keep="first", subset=['text'])]
     return df
 
-
 # Clean dataset functions -------------------------------------
-def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
-    ds_exp_fp, percent_dataset, finetune):
+def data_fusion(args):
     dataframes = []
-    filepaths = obtain_filepaths(directory_of_dataset)
+    filepaths = obtain_filepaths(args.original_dataset_filepath)
     for filepath in filepaths:
         df = clean_individual_dataset(filepath)
         dataframes.append(df)
@@ -239,20 +231,22 @@ def data_fusion(directory_of_dataset, explanations_filepath, ds_noexp_fp,
 
     #Check for duplicate tweets
     df_noexp = check_for_duplicate_tweets(df_total)
-    df_total.drop_duplicates(subset=['text'], inplace=True)
+    df_noexp.drop_duplicates(subset=['text'], inplace=True)
+    #df_total.drop_duplicates(subset=['text'], inplace=True)
     
     #Get distributions and counts of labels
     #inspect_labels(df_total)
 
     #Sample dataset if provided with percent dataset argument
-    if finetune and percent_dataset != 1.0:
+    if args.percent_dataset != 1.0:
         df_noexp = df_noexp.sample(frac=1).reset_index(drop=True) #Shuffle in place
-        df_noexp = df_noexp.head(int(len(df_noexp)*(percent_dataset))) #Get first percent of dataframe
+        df_noexp = df_noexp.head(int(len(df_noexp)*(args.percent_dataset))) #Get first percent of dataframe
 
-    explanations = read_explanations(explanations_filepath)
-    df_exp = create_explanations_dataset(df_total, explanations)
-    df_noexp.to_csv(ds_noexp_fp, index=False)
-    df_exp.to_csv(ds_exp_fp, index=False)
+
+    explanations = read_explanations(args.explanations_filepath)
+    df_exp = create_explanations_dataset(df_noexp, explanations)
+    df_noexp.to_csv(args.noexp_csv_filepath, index=False)
+    df_exp.to_csv(args.exp_csv_filepath, index=False)
 
 
 # Main -------------------------------------------------------------
@@ -262,9 +256,7 @@ def main():
     if not os.path.exists('plots'):
         os.makedirs('plots')
 
-    data_fusion(args.original_dataset_filepath, args.explanations_filepath,
-        args.noexp_csv_filepath, args.exp_csv_filepath, args.percent_dataset, 
-        args.finetune)
+    data_fusion(args)
 
     data_noexp = load_dataset("csv", data_files=args.noexp_csv_filepath)
     data_exp = load_dataset("csv", data_files=args.exp_csv_filepath)
