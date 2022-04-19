@@ -150,20 +150,49 @@ def main():
 
     with torch.no_grad():
         train_ids = tokenized_train['input_ids']
-        model_outputs = model(train_ids)
         
+        #At this point we have tokenized all 671760 datapoints
+        #We then pass them through the model and then restructure
+        #the tensor to be (18660, num_explanations * 768)
+        
+        #Splits train_ids into tuple of Torch.Tensor
+        
+        train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / 6))
+        print(train_ids_split[0].shape)
+    
+        emb = [] 
+        #Create embeddings by splitting train_ids
+        for train_ids in train_ids_split:
+            model_outputs = model(train_ids)
+            #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
+            output = model_outputs['last_hidden_state']
+            #0 of last hidden layer is the CLS token
+            embeddings = output[:,0,:]
+            emb.append(embeddings)
+
+
+
+        embeddings = torch.vstack(emb)
+        print(embeddings.shape)
+
+        """
+        #model_outputs = model(train_ids)
+ 
         #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
         output = model_outputs['last_hidden_state']
+
         
         #0 of last hidden layer is the CLS token
         embeddings = output[:,0,:]
-        
+        """
+
         #shape becomes num_datapoints x (num_explanations + num textual_descriptions) x 768
         embeddings = torch.reshape(embeddings, (num_datapoints, num_exp_td, 768))
+        print(embeddings.shape)
         
         #Flatten tensors so that you have (num datapoints, num_exp_td x 768) 
         embeddings = torch.flatten(embeddings, start_dim=1)
-
+        print(embeddings.shape)
         #Save embedding as pickle file 
 
         torch.save(embeddings,
