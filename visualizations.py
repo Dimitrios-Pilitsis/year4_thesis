@@ -317,7 +317,7 @@ def create_pr_curves(predictions, labels, plots_filepath):
 
 
 def create_confusion_matrix(predictions, true_values, plots_filepath):
-    ConfusionMatrixDisplay.from_predictions(predictions, true_values,
+    ConfusionMatrixDisplay.from_predictions(true_values, predictions,
         labels=list(range(0, 9)))
       
     plt.title("Confusion matrix")

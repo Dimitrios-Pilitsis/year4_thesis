@@ -105,17 +105,17 @@ def main():
 
     # Variables for ExpBERT embeddings --------------------------------------------
 
-    num_datapoints = int(args.percent_dataset * 18660) #number of original datapoints of crisis dataset
+    num_datapoints = int(args.percent_dataset * 17117) #number of original datapoints of crisis dataset
     print(num_datapoints)
     dataset_size = raw_datasets.num_rows['train']
 
-    if dataset_size == 671760:
+    if dataset_size == 616212:
         # number of explanations and textual descriptions
         num_exp_td = dataset_size / num_datapoints
     else:
         #TODO: Adapt so it works for any explanation set
         #for now, percent_dataset only works with 36 explanations
-        num_exp_td = 671760 / 18660
+        num_exp_td = 616212 / 17117
     
     #Confirm it is a float that can be converted to int without rounding
     if num_exp_td % 1 != 0:
