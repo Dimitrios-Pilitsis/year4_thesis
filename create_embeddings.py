@@ -189,6 +189,7 @@ def main():
             output = model_outputs['last_hidden_state']
             #0 of last hidden layer is the CLS token
             embeddings = output[:,0,:]
+            print(embeddings.shape)
             emb.append(embeddings)
 
 
@@ -206,6 +207,11 @@ def main():
         #0 of last hidden layer is the CLS token
         embeddings = output[:,0,:]
         """
+
+
+
+        #embeddings = torch.reshape(embeddings, (num_datapoints, num_exp_td*768))
+
         #shape becomes num_datapoints x (num_explanations + num textual_descriptions) x 768
         embeddings = torch.reshape(embeddings, (num_datapoints, num_exp_td, 768))
         print(embeddings.shape)

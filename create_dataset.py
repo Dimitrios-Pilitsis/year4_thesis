@@ -241,8 +241,7 @@ def data_fusion(args):
     if args.percent_dataset != 1.0:
         df_noexp = df_noexp.sample(frac=1).reset_index(drop=True) #Shuffle in place
         df_noexp = df_noexp.head(int(len(df_noexp)*(args.percent_dataset))) #Get first percent of dataframe
-
-
+    
     explanations = read_explanations(args.explanations_filepath)
     df_exp = create_explanations_dataset(df_noexp, explanations)
     df_noexp.to_csv(args.noexp_csv_filepath, index=False)
@@ -265,6 +264,8 @@ def main():
     
     visualizations_dataset(args.noexp_csv_filepath,
         args.exp_csv_filepath)
+
+    label_distribution_pie_chart(args.noexp_csv_filepath)
 
 if __name__ == "__main__":
     main()
