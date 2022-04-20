@@ -105,10 +105,16 @@ def main():
 
     # Variables for ExpBERT embeddings --------------------------------------------
 
-    dataset_size = raw_datasets.num_rows['train']
     num_datapoints = 18660 #number of original daatapoints of crisis dataset
-    # number of explanations and textual descriptions
-    num_exp_td = dataset_size / num_datapoints 
+    if raw_datasets.num_rows['train'] == 671760:
+        dataset_size = raw_datasets.num_rows['train']
+        # number of explanations and textual descriptions
+        num_exp_td = dataset_size / num_datapoints
+    else:
+        #TODO: Adapt so it works for any explanation set
+        #for now, percent_dataset only works with 36 explanations
+        dataset_size = 671760
+        num_exp_td = 671760 / num_datapoints
     
     #Confirm it is a float that can be converted to int without rounding
     if num_exp_td % 1 != 0:
@@ -177,8 +183,6 @@ def main():
         #Create embeddings by splitting train_ids
         for train_ids in train_ids_split:
             model_outputs = model(train_ids)
-            print(torch.max(model_outputs))
-            exit(0)
             #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
             output = model_outputs['last_hidden_state']
             #0 of last hidden layer is the CLS token
