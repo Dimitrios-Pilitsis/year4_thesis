@@ -1,4 +1,4 @@
-cd ..
+cd ../..
 
 python3 create_dataset.py --dataset-percent 0.01 --output-noexp-directory ./dataset/crisis_dataset_size_1/noexp/ --output-exp-directory ./dataset/crisis_dataset_size_1/exp/ --noexp-csv-filepath ./dataset/dataset_noexp_size_1.csv --exp-csv-filepath ./dataset/dataset_exp_1.csv
 python3 noexp_finetune_run.py --noexp-dataset-filepath ./dataset/crisis_dataset_size_1/noexp/ --percent-dataset 0.01
