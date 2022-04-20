@@ -105,16 +105,17 @@ def main():
 
     # Variables for ExpBERT embeddings --------------------------------------------
 
-    num_datapoints = 18660 #number of original daatapoints of crisis dataset
-    if raw_datasets.num_rows['train'] == 671760:
-        dataset_size = raw_datasets.num_rows['train']
+    num_datapoints = int(args.percent_dataset * 18660) #number of original datapoints of crisis dataset
+    print(num_datapoints)
+    dataset_size = raw_datasets.num_rows['train']
+
+    if dataset_size == 671760:
         # number of explanations and textual descriptions
         num_exp_td = dataset_size / num_datapoints
     else:
         #TODO: Adapt so it works for any explanation set
         #for now, percent_dataset only works with 36 explanations
-        dataset_size = 671760
-        num_exp_td = 671760 / num_datapoints
+        num_exp_td = 671760 / 18660
     
     #Confirm it is a float that can be converted to int without rounding
     if num_exp_td % 1 != 0:
@@ -137,9 +138,10 @@ def main():
 
     if args.tiny_dataset:
         if args.exp_flag:
-            dataset_size = num_exp_td*5 
-            num_datapoints = int(dataset_size / num_exp_td)
-            tokenized_train = tokenizer(raw_datasets['train']['text'][:dataset_size], truncation=True, padding=True, return_tensors='pt')
+            dataset_size_sample = num_exp_td*5 
+            num_datapoints = int(dataset_size_sample / num_exp_td)
+            tokenized_train = \
+                tokenizer(raw_datasets['train']['text'][:dataset_size_sample], truncation=True, padding=True, return_tensors='pt')
         else:
             tokenized_train = tokenizer(raw_datasets['train']['text'][:100], truncation=True, padding=True, return_tensors='pt')
     else:
@@ -204,7 +206,6 @@ def main():
         #0 of last hidden layer is the CLS token
         embeddings = output[:,0,:]
         """
-
         #shape becomes num_datapoints x (num_explanations + num textual_descriptions) x 768
         embeddings = torch.reshape(embeddings, (num_datapoints, num_exp_td, 768))
         print(embeddings.shape)
