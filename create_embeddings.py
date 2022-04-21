@@ -116,7 +116,7 @@ def main():
         #TODO: Adapt so it works for any explanation set
         #for now, percent_dataset only works with 36 explanations
         num_exp_td = 616212 / 17117
-    
+
     #Confirm it is a float that can be converted to int without rounding
     if num_exp_td % 1 != 0:
         raise ValueError("Need to provide the correct dataset size")
@@ -179,7 +179,9 @@ def main():
         
         #Splits train_ids into tuple of Torch.Tensor
         
-        train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / 100))
+        #train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / 100))
+        #TODO: Try with num_ex_td length splits
+        train_ids_split = torch.split(train_ids, num_exp_td)
     
         emb = [] 
         #Create embeddings by splitting train_ids
