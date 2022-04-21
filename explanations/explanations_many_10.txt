@@ -1,0 +1,98 @@
+someone has died or is injured
+the person is dead
+there are multiple dead people
+there is an injured person
+there are multiple injured people
+the person has passed away
+many people passed away
+there is a casualty
+there are casualities
+there are multiple casualties
+
+someone is missing
+many people are missing
+they couldn't find the person
+they couldn't find the people
+someone is trapped
+there are many people trapped
+someone was found 
+many people were found
+someone was rescued
+many people were rescued
+
+there was an evacuation
+there were orders to evacuate
+the person was displaced
+people were displaced
+the person was sent to a shelter
+people were sent to shelters
+the person was evacuated
+people were evacuated
+the person was relocated
+people were relocated
+
+there are damaged buildings
+there are damaged roads
+there are damaged bridges
+there is no electricity
+there is no water
+there is no heating
+there is no phone signal
+service has been restored
+road has been fixed
+electricity has been restored
+
+people need help urgently
+people are asking for donations 
+people want to donate
+people are asking for help
+people are offering to help 
+people are asking to volunteer
+people are volunteering
+people are asking how they can help
+person is providing relief
+people are providing relief
+
+a warning was issued
+many warnings were issued
+the warning was lifted
+many warnings have been lifted
+people are asked to be careful
+there are tips
+there is a tip
+there is guidance
+people are being warned 
+there is advice
+
+person is praying
+people are praying
+person is providing emotional support
+people are providing emotional support
+person is keeping others in their thoughts
+people are keeping others in their thoughts
+thoughts are with people
+person is hopeful
+people are hopeful
+people are having prayers
+
+contains useful information
+helps to understand the situation
+contains important information
+contains analysis
+analyzes data
+specifies magnitude of earthquake
+specifies depth of earthquake
+discusses prediction systems 
+contains facts
+is news coverage
+
+no useful information
+doesn't provide information
+is irrelevant
+is unconnected
+is random
+not related
+not linked to disaster
+no mention of earthquake
+Discusses the future
+has nothing to do with natural disaster
