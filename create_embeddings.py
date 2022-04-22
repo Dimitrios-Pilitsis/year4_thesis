@@ -90,6 +90,16 @@ def get_explanation_type(exp_dataset_filepath):
 
     return explanation_type
 
+# Sorting -----------------------------------------------
+
+def filepath_keys(text):
+    val = int(text.split("/")[-1].split(".")[0])
+    return val
+
+#filepath_keys("./embeddings/exp_normal_bert-base-cased/142.pt")
+#exit(0)
+
+
 
 # Main -------------------------------------------------------------------
 def main():
@@ -205,6 +215,8 @@ def main():
         embeddings_filepath = f'./embeddings/exp_{explanation_type}_{args.checkpoint}'
         if not os.path.exists(embeddings_filepath):
             os.makedirs(embeddings_filepath)
+
+        """
         emb = [] 
         #Create embeddings by splitting train_ids
         for count, train_ids in enumerate(train_ids_split):
@@ -218,14 +230,17 @@ def main():
                 f'{embeddings_filepath}/{count}.pt')
             torch.cuda.empty_cache()
             #emb.append(embeddings)
-
+        """
         #Obtain and sort filelist of subembeddings
         filelist = []
         for filename in os.listdir(embeddings_filepath):
             f = os.path.join(embeddings_filepath, filename)
             filelist.append(f)
+
+        #TODO:Fix sort
+
+        filelist.sort(key=filepath_keys)
         
-        filelist.sort(key=int)
         split_files = int(args.split_value / 4)
         filelist_chunks = [filelist[x:x+split_files] for x in range(0, len(x),
             split_files)]
