@@ -125,7 +125,7 @@ def main():
 
 
 
-    # Embeddings NoExp ---------------------------------------------------
+    # Create tokenized dataset ---------------------------------------------------
 
     if not os.path.exists('embeddings'):
         os.makedirs('embeddings')
@@ -210,19 +210,12 @@ def main():
         embeddings = output[:,0,:]
         """
 
-
-
-        #embeddings = torch.reshape(embeddings, (num_datapoints, num_exp_td*768))
-
-        #shape becomes num_datapoints x (num_explanations + num textual_descriptions) x 768
-        embeddings = torch.reshape(embeddings, (num_datapoints, num_exp_td, 768))
+        #Reshape to expect for instance (17117,36*768) i.e. have 1 unique tweet
+        #Per row of tensor
+        embeddings = torch.reshape(embeddings, (num_datapoints, num_exp_td*768))
         print(embeddings.shape)
-        
-        #Flatten tensors so that you have (num datapoints, num_exp_td x 768) 
-        embeddings = torch.flatten(embeddings, start_dim=1)
-        print(embeddings.shape)
+
         #Save embedding as pickle file 
-
         torch.save(embeddings,
         f'./embeddings/exp_{explanation_type}_{args.checkpoint}_embeddings.pt')
 

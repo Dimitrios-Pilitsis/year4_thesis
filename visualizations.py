@@ -40,7 +40,8 @@ def label_distribution_pie_chart(filepath):
     df = pd.read_csv(filepath, header=0)
     counts = df.groupby('labels').count()/len(df.index) #percentage of each label
     sizes = (counts['text']*100).tolist()
-    labels = df.labels.unique()
+    labels = df.labels.unique().tolist()
+    labels.sort()
     
     label_conversion = {
         0 : 'injured_or_dead_people',
@@ -55,6 +56,7 @@ def label_distribution_pie_chart(filepath):
     }
     
     labels = [label_conversion[x] for x in labels]
+
     #Make labels into phrases with spaces rather than underscore
     labels = [label.replace("_", " ") for label in labels]
     #Capitalize first letter of each label
