@@ -65,6 +65,13 @@ def parse_args():
         help="Percentage of the training data to use."
     )
 
+    parser.add_argument(
+        "--split_value", 
+        type=float, 
+        default=25, 
+        help="How much to split train_ids before obtaining embeddings."
+    )
+
     args = parser.parse_args()
     return args
 
@@ -160,7 +167,8 @@ def main():
         device = torch.device("cpu")
 
     model = model.to(device)
-
+    tokenized_train = tokenized_train.to(device)
+    torch.cuda.empty_cache()
 
     # NoExp ----------------------------------------------------------------
 
@@ -183,13 +191,14 @@ def main():
 
     with torch.no_grad():
         train_ids = tokenized_train['input_ids']
+        train_ids = train_ids.to(device)
         
         #At this point we have tokenized all 671760 datapoints
         #We then pass them through the model and then restructure
         #the tensor to be (18660, num_explanations * 768)
         
         #Splits train_ids into tuple of Torch.Tensor
-        train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / 7))
+        train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / args.split_value))
         #train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / 100))
         
         #train_ids_split = torch.split(train_ids, num_exp_td)
@@ -208,6 +217,7 @@ def main():
             print(count, embeddings.shape)
             torch.save(embeddings,
                 f'{embeddings_filepath}/embeddings_{count}.pt')
+            torch.cuda.empty_cache()
             #emb.append(embeddings)
 
         #Obtain and sort filelist of subembeddings
@@ -217,11 +227,17 @@ def main():
             filelist.append(f)
         
         filelist.sort()
+
+        #TODO: Load and resave a fraction of filelist, say 25% at a time
         
         #Load and append each sub embedding to emb
-        for file in filelist:
+        for count, file in enumerate(filelist):
+            print(count)
             emb_current = torch.load(file) 
             emb.append(emb_current)
+            torch.cuda.empty_cache()
+
+
         
         #Stack all sub embeddings into single embedding
         embeddings = torch.vstack(emb)
