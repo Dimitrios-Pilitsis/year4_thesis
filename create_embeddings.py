@@ -71,7 +71,7 @@ def parse_args():
     parser.add_argument(
         "--split-value", 
         type=float, 
-        default=25, 
+        default=100, 
         help="How much to split train_ids before obtaining embeddings."
     )
 
@@ -205,19 +205,9 @@ def main():
         train_ids = tokenized_train['input_ids']
         train_ids = train_ids.to(device)
         
-        #At this point we have tokenized all 671760 datapoints
-        #We then pass them through the model and then restructure
-        #the tensor to be (18660, num_explanations * 768)
-        
         #Splits train_ids into tuple of Torch.Tensor
         train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / args.split_value))
-        #train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / 100))
         
-        #train_ids_split = torch.split(train_ids, num_exp_td)
-        embeddings_filepath = f'./embeddings/exp_{explanation_type}_{args.checkpoint}'
-        if not os.path.exists(embeddings_filepath):
-            os.makedirs(embeddings_filepath)
-
         emb = [] 
         #Create embeddings by splitting train_ids
         for count, train_ids in enumerate(train_ids_split):
@@ -228,16 +218,14 @@ def main():
             embeddings = output[:,0,:]
             print(count, embeddings.shape)
             embeddings = embeddings.cpu().detach().numpy()
-            #torch.save(embeddings,
-            #    f'{embeddings_filepath}/{count}.pt')
             emb.append(embeddings)
             torch.cuda.empty_cache()
         
         emb = np.array(emb)
         emb = np.vstack(emb)
-        print(emb.shape)
         
         embeddings = torch.tensor(emb)
+        print(embeddings.shape)
 
         #Reshape to expect for instance (17117,36*768) i.e. have 1 unique tweet
         #Per row of tensor
@@ -248,10 +236,6 @@ def main():
         torch.save(embeddings,
         f'{embeddings_filepath}_embeddings.pt')
 
-        #Remove all subembeddings to save space
-        for file in filelist:
-            os.remove(file)
-        os.rmdir(embeddings_filepath)
 
 
 if __name__ == "__main__":
