@@ -66,7 +66,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--split_value", 
+        "--split-value", 
         type=float, 
         default=25, 
         help="How much to split train_ids before obtaining embeddings."
@@ -167,7 +167,6 @@ def main():
         device = torch.device("cpu")
 
     model = model.to(device)
-    tokenized_train = tokenized_train.to(device)
     torch.cuda.empty_cache()
 
     # NoExp ----------------------------------------------------------------
@@ -205,7 +204,6 @@ def main():
         embeddings_filepath = f'./embeddings/exp_{explanation_type}_{args.checkpoint}'
         if not os.path.exists(embeddings_filepath):
             os.makedirs(embeddings_filepath)
-        
         emb = [] 
         #Create embeddings by splitting train_ids
         for count, train_ids in enumerate(train_ids_split):
@@ -216,7 +214,7 @@ def main():
             embeddings = output[:,0,:]
             print(count, embeddings.shape)
             torch.save(embeddings,
-                f'{embeddings_filepath}/embeddings_{count}.pt')
+                f'{embeddings_filepath}/{count}.pt')
             torch.cuda.empty_cache()
             #emb.append(embeddings)
 
@@ -226,16 +224,26 @@ def main():
             f = os.path.join(embeddings_filepath, filename)
             filelist.append(f)
         
-        filelist.sort()
-
-        #TODO: Load and resave a fraction of filelist, say 25% at a time
+        filelist.sort(key=int)
+        split_files = int(args.split_value / 4)
+        filelist_chunks = [filelist[x:x+split_files] for x in range(0, len(x),
+            split_files)]
         
+        emb = []
+        #TODO: Load and resave a fraction of filelist, say 25% at a time
         #Load and append each sub embedding to emb
-        for count, file in enumerate(filelist):
-            print(count)
-            emb_current = torch.load(file) 
-            emb.append(emb_current)
-            torch.cuda.empty_cache()
+        for file_chunk in filechunks:
+            emb_chunk = []
+            for count, file in enumerate(filelist_chunks):
+                print(count)
+                emb_current = torch.load(file) 
+                emb_chunk.append(emb_current)
+                torch.cuda.empty_cache()
+
+            emb.append(emb_chunk)
+
+        print(emb)
+        exit(0)
 
 
         
