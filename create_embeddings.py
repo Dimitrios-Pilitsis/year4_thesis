@@ -221,6 +221,7 @@ def main():
             emb.append(embeddings)
             torch.cuda.empty_cache()
         
+        #Stack into (num datapoints, 768)
         emb = np.array(emb)
         emb = np.vstack(emb)
         
@@ -233,6 +234,7 @@ def main():
         print(embeddings.shape)
 
         #Save final embedding as pickle file 
+        embeddings_filepath = f'./embeddings/exp_{explanation_type}_{args.checkpoint}'
         torch.save(embeddings,
         f'{embeddings_filepath}_embeddings.pt')
 
