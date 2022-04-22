@@ -242,28 +242,22 @@ def main():
         filelist.sort(key=filepath_keys)
         
         split_files = int(args.split_value / 4)
-        filelist_chunks = [filelist[x:x+split_files] for x in range(0, len(x),
-            split_files)]
+        filelist_chunks = [filelist[x:x+split_files] for x in range(0,
+            len(filelist), split_files)]
         
         emb = []
         #TODO: Load and resave a fraction of filelist, say 25% at a time
         #Load and append each sub embedding to emb
-        for file_chunk in filechunks:
+        for file_chunk in filelist_chunks:
             emb_chunk = []
-            for count, file in enumerate(filelist_chunks):
-                print(count)
+            for count, file in enumerate(file_chunk):
                 emb_current = torch.load(file) 
                 emb_chunk.append(emb_current)
                 torch.cuda.empty_cache()
 
             emb.append(emb_chunk)
 
-        print(emb)
         emb = list(chain.from_iterable(emb))
-        print(emb)
-        exit(0)
-
-
         
         #Stack all sub embeddings into single embedding
         embeddings = torch.vstack(emb)
@@ -280,9 +274,11 @@ def main():
         f'{embeddings_filepath}_embeddings.pt')
 
         #Remove all subembeddings to save space
+        """
         for file in filelist:
             os.remove(file)
         os.rmdir(embeddings_filepath)
+        """
 
 
 if __name__ == "__main__":
