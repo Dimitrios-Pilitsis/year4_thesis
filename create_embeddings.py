@@ -178,26 +178,49 @@ def main():
         #the tensor to be (18660, num_explanations * 768)
         
         #Splits train_ids into tuple of Torch.Tensor
-        
+        train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / 7))
         #train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / 100))
-        #TODO: Try with num_ex_td length splits
-        train_ids_split = torch.split(train_ids, num_exp_td)
-    
+        
+        #train_ids_split = torch.split(train_ids, num_exp_td)
+        embeddings_filepath = f'./embeddings/exp_{explanation_type}_{args.checkpoint}'
+        if not os.path.exists(embeddings_filepath):
+            os.makedirs(embeddings_filepath)
+        
         emb = [] 
         #Create embeddings by splitting train_ids
-        for train_ids in train_ids_split:
+        for count, train_ids in enumerate(train_ids_split):
             model_outputs = model(train_ids)
             #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
             output = model_outputs['last_hidden_state']
             #0 of last hidden layer is the CLS token
             embeddings = output[:,0,:]
-            print(embeddings.shape)
-            emb.append(embeddings)
+            print(count, embeddings.shape)
+            torch.save(embeddings,
+                f'./embeddings/exp_{explanation_type}_{args.checkpoint}/embeddings_{count}.pt')
+            #emb.append(embeddings)
 
 
+
+
+
+        filelist = []
+        for filename in os.listdir(embeddings_filepath):
+            f = os.path.join(embeddings_filepath, filename)
+            filelist.append(f)
+        
+        print(filelist)
+        filelist.sort()
+        print(filelist)
+
+        for file in filelist:
+            emb_current = torch.load(file) 
+            print(emb_current.shape)
+            emb.append(emb_current)
+        
 
         embeddings = torch.vstack(emb)
         print(embeddings.shape)
+        
 
         """
         #model_outputs = model(train_ids)
@@ -215,9 +238,14 @@ def main():
         embeddings = torch.reshape(embeddings, (num_datapoints, num_exp_td*768))
         print(embeddings.shape)
 
-        #Save embedding as pickle file 
+        #Save final embedding as pickle file 
         torch.save(embeddings,
         f'./embeddings/exp_{explanation_type}_{args.checkpoint}_embeddings.pt')
+
+        #Remove all subembeddings to save space
+        for file in filelist:
+            os.remove(file)
+        os.rmdir(embeddings_filepath)
 
 
 if __name__ == "__main__":
