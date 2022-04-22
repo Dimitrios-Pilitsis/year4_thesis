@@ -87,6 +87,10 @@ def get_explanation_type(exp_dataset_filepath):
 def main():
     args = parse_args()
 
+
+    
+    
+
     explanation_type = get_explanation_type(args.exp_dataset_filepath)
 
     #Model is set to evaluation mode by default using model.eval()
@@ -148,7 +152,14 @@ def main():
         tokenized_train = tokenizer(raw_datasets['train']['text'], truncation=True, padding=True, return_tensors='pt')
     
 
+    torch.backends.cudnn.benchmark = True
+    
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
 
+    model = model.to(device)
 
 
     # NoExp ----------------------------------------------------------------
