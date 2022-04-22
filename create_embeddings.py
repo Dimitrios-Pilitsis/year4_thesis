@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import argparse
+from itertools import chain
 
 from sklearn.metrics import ConfusionMatrixDisplay 
 
@@ -242,6 +243,8 @@ def main():
 
             emb.append(emb_chunk)
 
+        print(emb)
+        emb = list(chain.from_iterable(emb))
         print(emb)
         exit(0)
 
