@@ -133,6 +133,10 @@ def main():
     print(num_datapoints)
     dataset_size = raw_datasets.num_rows['train']
 
+    num_exp_td = dataset_size / num_datapoints
+
+    """
+
     if dataset_size == 616212:
         # number of explanations and textual descriptions
         num_exp_td = dataset_size / num_datapoints
@@ -144,6 +148,7 @@ def main():
     #Confirm it is a float that can be converted to int without rounding
     if num_exp_td % 1 != 0:
         raise ValueError("Need to provide the correct dataset size")
+    """
     
     num_exp_td = int(num_exp_td)
 
