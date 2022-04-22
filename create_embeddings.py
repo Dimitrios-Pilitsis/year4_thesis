@@ -5,6 +5,8 @@ from itertools import chain
 
 from sklearn.metrics import ConfusionMatrixDisplay 
 
+import numpy as np
+
 import torch
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
@@ -216,7 +218,6 @@ def main():
         if not os.path.exists(embeddings_filepath):
             os.makedirs(embeddings_filepath)
 
-        """
         emb = [] 
         #Create embeddings by splitting train_ids
         for count, train_ids in enumerate(train_ids_split):
@@ -226,43 +227,17 @@ def main():
             #0 of last hidden layer is the CLS token
             embeddings = output[:,0,:]
             print(count, embeddings.shape)
-            torch.save(embeddings,
-                f'{embeddings_filepath}/{count}.pt')
+            embeddings = embeddings.cpu().detach().numpy()
+            #torch.save(embeddings,
+            #    f'{embeddings_filepath}/{count}.pt')
+            emb.append(embeddings)
             torch.cuda.empty_cache()
-            #emb.append(embeddings)
-        """
-        #Obtain and sort filelist of subembeddings
-        filelist = []
-        for filename in os.listdir(embeddings_filepath):
-            f = os.path.join(embeddings_filepath, filename)
-            filelist.append(f)
-
-        #TODO:Fix sort
-
-        filelist.sort(key=filepath_keys)
         
-        split_files = int(args.split_value / 4)
-        filelist_chunks = [filelist[x:x+split_files] for x in range(0,
-            len(filelist), split_files)]
+        emb = np.array(emb)
+        emb = np.vstack(emb)
+        print(emb.shape)
         
-        emb = []
-        #TODO: Load and resave a fraction of filelist, say 25% at a time
-        #Load and append each sub embedding to emb
-        for file_chunk in filelist_chunks:
-            emb_chunk = []
-            for count, file in enumerate(file_chunk):
-                emb_current = torch.load(file) 
-                emb_chunk.append(emb_current)
-                torch.cuda.empty_cache()
-
-            emb.append(emb_chunk)
-
-        emb = list(chain.from_iterable(emb))
-        
-        #Stack all sub embeddings into single embedding
-        embeddings = torch.vstack(emb)
-        print(embeddings.shape)
-        
+        embeddings = torch.tensor(emb)
 
         #Reshape to expect for instance (17117,36*768) i.e. have 1 unique tweet
         #Per row of tensor
@@ -274,11 +249,9 @@ def main():
         f'{embeddings_filepath}_embeddings.pt')
 
         #Remove all subembeddings to save space
-        """
         for file in filelist:
             os.remove(file)
         os.rmdir(embeddings_filepath)
-        """
 
 
 if __name__ == "__main__":
