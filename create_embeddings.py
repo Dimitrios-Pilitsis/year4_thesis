@@ -196,42 +196,26 @@ def main():
             embeddings = output[:,0,:]
             print(count, embeddings.shape)
             torch.save(embeddings,
-                f'./embeddings/exp_{explanation_type}_{args.checkpoint}/embeddings_{count}.pt')
+                f'{embeddings_filepath}/embeddings_{count}.pt')
             #emb.append(embeddings)
 
-
-
-
-
+        #Obtain and sort filelist of subembeddings
         filelist = []
         for filename in os.listdir(embeddings_filepath):
             f = os.path.join(embeddings_filepath, filename)
             filelist.append(f)
         
-        print(filelist)
         filelist.sort()
-        print(filelist)
-
+        
+        #Load and append each sub embedding to emb
         for file in filelist:
             emb_current = torch.load(file) 
-            print(emb_current.shape)
             emb.append(emb_current)
         
-
+        #Stack all sub embeddings into single embedding
         embeddings = torch.vstack(emb)
         print(embeddings.shape)
         
-
-        """
-        #model_outputs = model(train_ids)
- 
-        #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
-        output = model_outputs['last_hidden_state']
-
-        
-        #0 of last hidden layer is the CLS token
-        embeddings = output[:,0,:]
-        """
 
         #Reshape to expect for instance (17117,36*768) i.e. have 1 unique tweet
         #Per row of tensor
@@ -240,7 +224,7 @@ def main():
 
         #Save final embedding as pickle file 
         torch.save(embeddings,
-        f'./embeddings/exp_{explanation_type}_{args.checkpoint}_embeddings.pt')
+        f'{embeddings_filepath}_embeddings.pt')
 
         #Remove all subembeddings to save space
         for file in filelist:
