@@ -556,10 +556,12 @@ def get_datasets(args):
     with torch.no_grad():
         if args.exp_flag:
             embeddings = torch.load(args.exp_embeddings_filepath)
-            raw_datasets = load_from_disk(args.exp_dataset_filepath)
         else:
             embeddings = torch.load(args.noexp_embeddings_filepath)
-            raw_datasets = load_from_disk(args.noexp_dataset_filepath)
+        
+        #You want labels from NoExp as we have concatenated the 
+        #embeddings to be of size (num datapoints, num_exp_td * 768)
+        raw_datasets = load_from_disk(args.noexp_dataset_filepath)
         
         #Train includes all datapoints at this point
         labels = raw_datasets['train']['labels']
@@ -577,7 +579,7 @@ def get_datasets(args):
             emb_subset, labels_subset = dataset[dataset_idx]
             dataset = Dataset(emb_subset, labels_subset)
         """
-        
+
         #If the split results in equal values e.g. 70 and 30
         if (args.train_test_split * len(dataset)) % 1 == 0:
             train_size = int(args.train_test_split * len(dataset))
