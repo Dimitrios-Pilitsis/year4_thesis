@@ -187,24 +187,7 @@ def main():
     model = model.to(device)
     torch.cuda.empty_cache()
 
-    # NoExp ----------------------------------------------------------------
-
-    if args.exp_flag is False:
-        with torch.no_grad():
-            train_ids = tokenized_train['input_ids']
-            model_outputs = model(train_ids)
-            
-            #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
-            output = model_outputs['last_hidden_state'] 
-            
-            #0 of last hidden layer is the CLS token
-            embeddings = output[:, 0, :]
-            
-            torch.save(embeddings, f'./embeddings/noexp_{args.checkpoint}_embeddings.pt')
-            exit(0)
-   
-
-    # ExpBERT embeddings ------------------------------------------------------
+    # Create embeddings ------------------------------------------------------
 
     with torch.no_grad():
         train_ids = tokenized_train['input_ids']
@@ -232,6 +215,11 @@ def main():
         
         embeddings = torch.tensor(emb)
         print(embeddings.shape)
+        
+        #NoExp ends here
+        if args.exp_flag is False:
+            torch.save(embeddings, f'./embeddings/noexp_{args.checkpoint}_embeddings.pt')
+            exit(0)
 
         #Reshape to expect for instance (17117,36*768) i.e. have 1 unique tweet
         #Per row of tensor
