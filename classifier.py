@@ -115,20 +115,6 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--learning-rate", 
-        default=1e-2, 
-        type=float, 
-        help="Learning rate"
-    )
-
-    parser.add_argument(
-        "--sgd-momentum", 
-        default=0.9, 
-        type=float, 
-        help="SGD Momentum"
-    )
-
-    parser.add_argument(
         "--num-epochs", 
         type=int, 
         default=10, 
@@ -137,9 +123,9 @@ def parse_args():
     
     parser.add_argument(
         "--batch-size",
-        default=128,
+        default=8,
         type=int,
-        help="Number of images within each mini-batch",
+        help="Number of datapoints within each batch",
     )
 
     parser.add_argument(
@@ -657,7 +643,7 @@ def main():
     train_loader = DataLoader(
         train_dataset,
         shuffle=True,
-        batch_size=8,
+        batch_size=args.batch_size,
         num_workers=args.worker_count,
         pin_memory=True,
     )
@@ -665,7 +651,7 @@ def main():
     test_loader = DataLoader(
         test_dataset,
         shuffle=True,
-        batch_size=8,
+        batch_size=args.batch_size,
         num_workers=args.worker_count,
         pin_memory=True,
     )

@@ -183,7 +183,7 @@ def create_explanations_dataset(df, explanations):
         'donation needs or offers or volunteering services',
         'caution and advice', 
         'sympathy and emotional support', 
-        'other_useful_information',
+        'other useful information',
         'not related or irrelevant',
     ]
     
