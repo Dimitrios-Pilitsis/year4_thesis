@@ -1,12 +1,48 @@
-import transformers
 from accelerate import Accelerator
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from datasets import load_from_disk, load_metric, DatasetDict
-import matplotlib.pyplot as plt
-import numpy as np
+from datasets import load_metric
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+#NoExp and ExpBERT
 
 
+
+def get_metrics(y_trues, preds):
+    accuracy = accuracy_score(y_trues, preds)
+
+    precision = precision_score(y_trues, preds,
+        labels=list(range(9)), average=None, zero_division=0)
+
+    recall = recall_score(y_trues, preds,
+        labels=list(range(9)), average=None, zero_division=0)
+
+    f1 = f1_score(y_trues, preds,
+        labels=list(range(9)), average=None, zero_division=0)
+
+    precision_weighted = precision_score(y_trues, preds,
+        labels=list(range(9)), average="weighted", zero_division=0)
+
+    recall_weighted = recall_score(y_trues, preds,
+        labels=list(range(9)), average="weighted", zero_division=0)
+
+    f1_weighted = f1_score(y_trues, preds,
+        labels=list(range(9)), average="weighted", zero_division=0)
+
+    results = {"accuracy": accuracy, 
+            "f1_weighted": f1_weighted,
+            "precision_weighted": precision_weighted,
+            "recall_weighted": recall_weighted,
+            "f1": f1,
+            "precision": precision,
+            "recall": recall
+    }
+    
+    return results
+
+
+
+
+#NoExp fine tune ------------------------------------------------
 # Metrics -----------------------------------------------------
 def compute_metrics(accelerator, model, dataloader):
 

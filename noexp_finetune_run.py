@@ -42,38 +42,15 @@ def parse_args():
 
     # Flags --------------------------------------------------------------
     parser.add_argument(
-        '--exp-flag', 
-        action='store_true', 
-        help="Run ExpBERT"
-    )
-
-    parser.add_argument(
-        "--full-logger",
-        action="store_true",
-        help="Set all logger settings on (including library loggers).",
-    )
-    
-    parser.add_argument(
         "--tiny-dataset",
         action="store_true",
         help="Use smaller dataset for training and evaluation.",
     )
 
     parser.add_argument(
-        "--use-saved-model",
-        action="store_true",
-        help="Use model that you have saved from previous run.",
-    )
-
-    parser.add_argument(
         "--save-model",
         action="store_true",
         help="Save the model that you will train.",
-    )
-
-    parser.add_argument(
-        '--eval', 
-        action='store_true'
     )
 
     # Directories -------------------------------------------------------------
@@ -89,13 +66,6 @@ def parse_args():
         type=str, 
         default="metrics", 
         help="Where to store the metrics of the model during training and testing."
-    )
-
-    parser.add_argument(
-        "--saved-model-filepath", 
-        type=str, 
-        default=None, 
-        help="Location of the model that has been saved that will be used for training."
     )
 
     parser.add_argument(
@@ -133,6 +103,14 @@ def parse_args():
         default=3, 
         help="Total number of epochs to perform during training."
     )
+    
+    parser.add_argument(
+        "--batch-size", 
+        type=int, 
+        default=8, 
+        help="Batch size for model."
+    )
+
 
     parser.add_argument(
         "--percent-dataset", 
@@ -153,61 +131,26 @@ def parse_args():
 
     args = parser.parse_args()
  
-    if args.use_saved_model and (args.saved_model_filepath is None or
-        os.path.isfile(args.saved_model_filepath)):
-        raise ValueError("Need to provide the correct filepath of the" +\
-        " saved model you want to load.")
-
     if args.save_model and args.output_model is None:
         raise ValueError("Must provide directory to save model that will" +\
         " be trained")
 
-    if len(args.checkpoint) > 0 and args.use_saved_model:
-        raise ValueError("Can't provide checkpoint and saved model directory")
-
-    if args.eval and args.use_saved_model == False:
-        raise ValueError("Can only evaluate a model that has been saved before.")
-
-   
-
     return args
 
 
-# Helper functions ------------------------------------------------------------
-def get_explanation_type(exp_dataset_filepath):
-    if exp_dataset_filepath == "./dataset/crisis_dataset/noexp/" or ("size" in
-        exp_dataset_filepath):
-        explanation_type = "normal"
-    else:
-        #e.g. ./dataset/crisis_dataset_few/exp/
-        filename = exp_dataset_filepath.split("/")
-        idx_explanation = [idx for idx, s in enumerate(filename) if 'crisis_dataset' in s][0]
-        explanation_type = filename[idx_explanation].split("_")[-1]
-
-    return explanation_type
 
 # Summary writer helper functions --------------------------------------------
-def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
-    percent_dataset, explanation_type):
+def get_filepath_numbered(log_dir, checkpoint, num_epochs, percent_dataset):
     """Get a unique directory that hasn't been logged to before for use with a TB
     SummaryWriter.
     """ 
     checkpoint = checkpoint.replace("-","_") 
-    if exp_flag:
-        tb_log_dir_prefix = (
-            f"Exp_{checkpoint}_" 
-            f"pd={percent_dataset}_" 
-            f"epochs={num_epochs}_" 
-            f"explanations={explanation_type}_"
-            f"run_"
-            )
-    else:
-        tb_log_dir_prefix = (
-            f"NoExpFinetune_{checkpoint}_"
-            f"pd={percent_dataset}_" 
-            f"epochs={num_epochs}_" 
-            f"run_"
-            )
+    tb_log_dir_prefix = (
+        f"NoExpFinetune_{checkpoint}_"
+        f"pd={percent_dataset}_" 
+        f"epochs={num_epochs}_" 
+        f"run_"
+    )
 
     i = 0
     while i < 1000:
@@ -222,12 +165,8 @@ def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
 
 # Tokenizer functions -------------------------------------------------
 
-def decode_text(tokenizer, text, exp_flag, *args):
-    if exp_flag:
-        encoded_input = tokenizer(text, args[0]) #args[0]=explanations
-    else:
-        encoded_input = tokenizer(text)
-
+def decode_text(tokenizer, text):
+    encoded_input = tokenizer(text)
     decoded_text = tokenizer.decode(encoded_input["input_ids"])
     return decoded_text
 
@@ -257,20 +196,14 @@ def main():
         datefmt="%m/%d/%Y %H:%M:%S",
         level=logging.INFO,
     )
-   
 
-    #Find explanation type (normal, bad, few, many)
-    explanation_type = get_explanation_type(args.exp_dataset_filepath)
-    
     if args.checkpoint == "cardiffnlp/twitter-roberta-base":
         checkpoint = args.checkpoint.split("/")[-1]
-        logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
-            checkpoint, args.num_epochs, args.percent_dataset,
-            explanation_type)
+        logs_filepath = get_filepath_numbered(Path(args.output_logs), 
+            checkpoint, args.num_epochs, args.percent_dataset)
     else:
-        logs_filepath = get_filepath_numbered(Path(args.output_logs), args.exp_flag,
-            args.checkpoint, args.num_epochs, args.percent_dataset,
-            explanation_type)
+        logs_filepath = get_filepath_numbered(Path(args.output_logs), 
+            args.checkpoint, args.num_epochs, args.percent_dataset)
 
     if not os.path.exists('metrics'):
         os.makedirs('metrics')
@@ -295,63 +228,27 @@ def main():
 
     logger.info(accelerator.state)
 
-    args.full_logger = False
-
-    if args.full_logger:
-        # Setup logging, we only want one process per machine to log things on the
-        # screen.
-        # accelerator.is_local_main_process is only True for one process per machine.
-
-        logger.setLevel(logging.INFO if accelerator.is_local_main_process 
-            else logging.ERROR)
-
-        if accelerator.is_local_main_process:
-            datasets.utils.logging.set_verbosity_warning()
-            transformers.utils.logging.set_verbosity_info() #outputs model config
-        else:
-            datasets.utils.logging.set_verbosity_error()
-            transformers.utils.logging.set_verbosity_error()
-
-
 
     # Important variables and flags --------------------------------------------
-    # TODO: turn variables into arguments passed from calling program
-
-    batch_size=8
-    
-    #Use latest model that was saved
     #Need to shift run number by -1 as latest model that has been trained is
     #current run - 1
     output_directory_save_model = get_filepath_numbered(Path(args.output_model),
-        args.exp_flag, args.checkpoint, args.num_epochs, args.percent_dataset, 
-        explanation_type)
+        args.checkpoint, args.num_epochs, args.percent_dataset)
 
-    #Model is set to evaluation mode by default using model.eval()
     #Using checkpoint is much quicker as model and tokenizer are cached by Huggingface
-    if args.use_saved_model:
-        model = \
-        AutoModelForSequenceClassification.from_pretrained(args.saved_model_filepath,
-            num_labels=9)
-        tokenizer = AutoTokenizer.from_pretrained(model_saved_filepath)
-    else:
-        model = AutoModelForSequenceClassification.from_pretrained(args.checkpoint,
-            num_labels=9)
-        tokenizer = AutoTokenizer.from_pretrained(args.checkpoint)
+    model = AutoModelForSequenceClassification.from_pretrained(args.checkpoint,
+        num_labels=9)
+    tokenizer = AutoTokenizer.from_pretrained(args.checkpoint)
 
     # Loading dataset ---------------------------------------------
-    if args.exp_flag:
-        raw_datasets = load_from_disk(args.exp_dataset_filepath)
-    else:
-        raw_datasets = load_from_disk(args.noexp_dataset_filepath)
-        raw_datasets = raw_datasets["train"].train_test_split(train_size=0.8,
-            shuffle=True)
+    raw_datasets = load_from_disk(args.noexp_dataset_filepath)
+    raw_datasets = raw_datasets["train"].train_test_split(train_size=0.8,
+        shuffle=True)
 
 
     # Log a few random samples from the training set:
     for index in random.sample(range(len(raw_datasets['train'])), 4):
         logger.info(f"Text of data point {index} of the training set sample: {raw_datasets['train'][index]['text']}.")
-        logger.info(f"Explanation of data point {index} of the training set "
-                    f"example: {raw_datasets['train'][index]['exp_and_td']}.") if args.exp_flag else None
         logger.info(f"Label of data point {index} of the training set sample: {raw_datasets['train'][index]['labels']}.")
 
 
@@ -360,17 +257,7 @@ def main():
     def tokenize_noexp_function(examples):
         return tokenizer(examples["text"], truncation=True)
 
-
-    def tokenize_exp_function(examples):
-        return tokenizer(examples['text'], examples['exp_and_td'],
-            truncation=True)
-
-    if args.exp_flag:
-        tokenized_datasets = raw_datasets.map(tokenize_exp_function, batched=True)
-        tokenized_datasets = tokenized_datasets.remove_columns(["exp_and_td"])
-    else:
-        tokenized_datasets = raw_datasets.map(tokenize_noexp_function, batched=True)
-
+    tokenized_datasets = raw_datasets.map(tokenize_noexp_function, batched=True)
 
     #Remove columns that aren't strings here
     tokenized_datasets = tokenized_datasets.remove_columns(["text"])
@@ -382,17 +269,10 @@ def main():
     # Log a few random samples from the tokenized dataset:
     for index in random.sample(range(len(tokenized_datasets['train'])), 4):
 
-        if args.exp_flag:
-            logger.info(f"Data point {index} of the tokenized training set sample: "
-            #f"{decode_text(tokenizer, raw_datasets['train'][index]['text'], {args.exp_flag}, raw_datasets['train'][index]['exp_and_td'])}.")
-            f"{decode_text(tokenizer, raw_datasets['train'][index]['text'], args.exp_flag, raw_datasets['train'][index]['exp_and_td'])}.")
-        else:
-            logger.info(f"Data point {index} of the tokenized training set sample: "
-            f"{decode_text(tokenizer, raw_datasets['train'][index]['text'],args.exp_flag)}.")
+        logger.info(f"Data point {index} of the tokenized training set sample:"
+            f"{decode_text(tokenizer, raw_datasets['train'][index]['text'])}.")
 
         logger.info(f"Input IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['input_ids']}.")
-        #logger.info(f"Token type IDs of data point {index} of the training set sample: {tokenized_datasets['train'][index]['token_type_ids']}.")
-
    
     if args.tiny_dataset:
         tokenized_datasets = create_tiny_dataset(tokenized_datasets,
@@ -404,9 +284,9 @@ def main():
     # Dataloader --------------------------------------------------
 
     train_dataloader = DataLoader(tokenized_datasets['train'], shuffle=True, 
-        batch_size=batch_size, collate_fn=data_collator)
+        batch_size=args.batch_size, collate_fn=data_collator)
     test_dataloader = DataLoader(tokenized_datasets['test'], shuffle=True,
-        batch_size=batch_size, collate_fn=data_collator)
+        batch_size=args.batch_size, collate_fn=data_collator)
 
 
     # Optimizer and learning rate scheduler -----------------------------
@@ -433,7 +313,7 @@ def main():
     logger.info(f"  Num examples = {tokenized_datasets['train'].num_rows}")
     logger.info(f"  Num Epochs = {args.num_epochs}")
     logger.info(f"  Num training steps = {num_training_steps}")
-    logger.info(f"  Instantaneous batch size per device = {batch_size}")
+    logger.info(f"  Instantaneous batch size per device = {args.batch_size}")
     progress_bar = tqdm(range(num_training_steps), disable=not accelerator.is_local_main_process)
 
     train_metrics_list = []
@@ -466,8 +346,6 @@ def main():
         test_metrics_list.append(test_metrics)
         logger.info(f"Epoch {epoch + 1} Test results: {test_metrics}")
         
-        #summary_writer_test(summary_writer, test_metrics, epoch)
-         
         summary_writer_metrics(summary_writer, train_metrics, epoch,
             train_flag=False)
 
@@ -478,7 +356,7 @@ def main():
     with open(metrics_filepath+'/test.p', 'wb') as fp:
         pickle.dump(test_metrics_list, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
-    visualizations(summary_writer, accelerator, model, test_dataloader, current_run, epoch)
+    visualizations_noexpfinetune(summary_writer, accelerator, model, test_dataloader, current_run, epoch)
 
 
     summary_writer.close()

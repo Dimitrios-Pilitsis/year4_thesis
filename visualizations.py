@@ -167,8 +167,6 @@ def get_preds_and_labels_all_classes(accelerator, model, dataloader):
 
 
 def summary_writer_pr_curves(summary_writer, predictions, labels, epoch):
-#def summary_writer_pr_curves(summary_writer, accelerator, model, dataloader, epoch):
-    
 
     l = list(range(0,9))
     # Create precision recall curves ----------------------------------
@@ -611,7 +609,7 @@ def metrics_plots(metrics_filepath, plots_filepath, current_run):
 
 
 #Visualizations for NoExp and ExpBERT
-def vis(predictions, labels, predictions_all, labels_all, current_run):
+def visualizations(predictions, labels, predictions_all, labels_all, current_run):
 
     metrics_filepath = "./metrics/" + current_run + "/"
     plots_filepath = "./plots/" + current_run + "/"
@@ -626,7 +624,7 @@ def vis(predictions, labels, predictions_all, labels_all, current_run):
 
 
 #Visualizations for NoExp finetuned
-def visualizations(summary_writer, accelerator, model, dataloader,
+def visualizations_noexpfinetune(summary_writer, accelerator, model, dataloader,
     current_run, epoch):
     
     metrics_filepath = "./metrics/" + current_run + "/"
@@ -634,16 +632,12 @@ def visualizations(summary_writer, accelerator, model, dataloader,
 
     predictions, labels = get_preds_and_labels_all_classes(accelerator, model, dataloader)
 
-    print(predictions)
-    print(labels)
-    print(len(predictions))
-    print(len(labels))
-
     predictions_single, labels_single = get_preds_and_labels(accelerator, model, dataloader) 
 
     summary_writer_pr_curves(summary_writer, predictions, labels, epoch)
     
     metrics_plots(metrics_filepath, plots_filepath, plots_filepath)
+
     # Individual visualizations
     create_confusion_matrix(predictions_single, labels_single, plots_filepath)
 
@@ -651,14 +645,3 @@ def visualizations(summary_writer, accelerator, model, dataloader,
 
     create_pr_curves(predictions, labels, plots_filepath)
 
-
-
-"""
-#To test visualizations without running run.py
-metrics_filepath = "./metrics/Exp_bert_base_cased_pd=1.0_epochs=3_explanations=normal_run_0/"
-plots_filepath = "./plots/Exp_bert_base_cased_pd=1.0_epochs=3_explanations=normal_run_0/"
-current_run = "Exp_bert_base_cased_pd=1.0_epochs=3_explanations=normal_run_0"
-metrics_plots(metrics_filepath, plots_filepath, current_run)
-fp = "./dataset/dataset_noexp.csv"
-label_distribution_pie_chart(fp)
-"""

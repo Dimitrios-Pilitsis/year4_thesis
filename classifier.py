@@ -8,13 +8,11 @@ import pickle
 from pathlib import Path
 import os
 
+import numpy as np
+
 import torch
 import torch.backends.cudnn
 from torch.utils.data import DataLoader, random_split
-from torch.utils.data import SubsetRandomSampler
-
-import numpy as np
-
 from torch import nn
 from torch.nn import functional as F
 from typing import Callable
@@ -28,6 +26,7 @@ from datasets import load_from_disk
 from tqdm.auto import tqdm
 
 from visualizations import *
+from metrics import *
 
 
 # Argparser --------------------------------------------------
@@ -198,50 +197,6 @@ def get_filepath_numbered(log_dir, exp_flag, checkpoint, num_epochs,
     return str(tb_log_dir)
 
 
-# Accuracy -----------------------------------------------
-def compute_accuracy(
-    labels: Union[torch.Tensor, np.ndarray], preds: Union[torch.Tensor, np.ndarray]
-) -> float:
-    """
-    Args:
-        labels: ``(batch_size, class_count)`` tensor or array containing example labels
-        preds: ``(batch_size, class_count)`` tensor or array containing model prediction
-    """
-    assert len(labels) == len(preds)
-    return float((labels == preds).sum()) / len(labels)
-
-def get_metrics(y_trues, preds):
-    accuracy = accuracy_score(y_trues, preds)
-
-    precision = precision_score(y_trues, preds,
-        labels=list(range(9)), average=None, zero_division=0)
-
-    recall = recall_score(y_trues, preds,
-        labels=list(range(9)), average=None, zero_division=0)
-
-    f1 = f1_score(y_trues, preds,
-        labels=list(range(9)), average=None, zero_division=0)
-
-    precision_weighted = precision_score(y_trues, preds,
-        labels=list(range(9)), average="weighted", zero_division=0)
-
-    recall_weighted = recall_score(y_trues, preds,
-        labels=list(range(9)), average="weighted", zero_division=0)
-
-    f1_weighted = f1_score(y_trues, preds,
-        labels=list(range(9)), average="weighted", zero_division=0)
-
-    results = {"accuracy": accuracy, 
-            "f1_weighted": f1_weighted,
-            "precision_weighted": precision_weighted,
-            "recall_weighted": recall_weighted,
-            "f1": f1,
-            "precision": precision,
-            "recall": recall
-    }
-    
-    return results
-
 # Classifier --------------------------------------------
 class MLP_1h(nn.Module):
     def __init__(self,
@@ -372,7 +327,8 @@ class Trainer:
                 with torch.no_grad():
                     preds = logits.argmax(-1)
                     train_preds.append(preds.cpu().numpy())
-                    accuracy = compute_accuracy(labels, preds)
+                    #accuracy = compute_accuracy(labels, preds)
+                    accuracy = accuracy_score(labels, preds)
 
                 data_load_time = data_load_end_time - data_load_start_time
                 step_time = time.time() - data_load_end_time
@@ -389,7 +345,6 @@ class Trainer:
             train_metrics_total.append(train_results_epoch)
             print(train_results_epoch)
 
-            #TODO: get validation metrics and append to val_metrics list 
             test_results_epoch = self.validate() #Run validation set
             test_metrics_total.append(test_results_epoch)
             self.model.train() #Need to put model back into train mode
@@ -505,7 +460,7 @@ class Trainer:
             pickle.dump(labels_all, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-        vis(test_results["preds"], test_results["labels"],
+        visualizations(test_results["preds"], test_results["labels"],
             predictions_all, labels_all, self.current_run)
 
 

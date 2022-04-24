@@ -1,21 +1,12 @@
 import os
-from pathlib import Path
 import argparse
-from itertools import chain
-
-from sklearn.metrics import ConfusionMatrixDisplay 
 
 import numpy as np
 
 import torch
-from torch.utils.data import DataLoader
-from torch.optim import AdamW
-from torch.utils.tensorboard import SummaryWriter
-
 from transformers import AutoTokenizer, AutoModel
 
-from datasets import load_from_disk, load_metric, DatasetDict
-
+from datasets import load_from_disk
 
 # Argparser -----------------------------------------------------------------
 
@@ -33,7 +24,7 @@ def parse_args():
     parser.add_argument(
         "--tiny-dataset",
         action="store_true",
-        help="Use smaller dataset for training and evaluation.",
+        help="Use tiny-dataset to confirm program works correctly.",
     )
 
 
@@ -106,15 +97,9 @@ def filepath_keys(text):
 # Main -------------------------------------------------------------------
 def main():
     args = parse_args()
-
-
     
-    
-
     explanation_type = get_explanation_type(args.exp_dataset_filepath)
 
-    #Model is set to evaluation mode by default using model.eval()
-    #Using checkpoint is much quicker as model and tokenizer are cached by Huggingface
     model = AutoModel.from_pretrained(args.checkpoint,
         num_labels=9)
     tokenizer = AutoTokenizer.from_pretrained(args.checkpoint)
@@ -130,28 +115,9 @@ def main():
     # Variables for ExpBERT embeddings --------------------------------------------
 
     num_datapoints = int(args.percent_dataset * 17117) #number of original datapoints of crisis dataset
-    print(num_datapoints)
     dataset_size = raw_datasets.num_rows['train']
 
-    num_exp_td = dataset_size / num_datapoints
-
-    """
-
-    if dataset_size == 616212:
-        # number of explanations and textual descriptions
-        num_exp_td = dataset_size / num_datapoints
-    else:
-        #TODO: Adapt so it works for any explanation set
-        #for now, percent_dataset only works with 36 explanations
-        num_exp_td = 616212 / 17117
-
-    #Confirm it is a float that can be converted to int without rounding
-    if num_exp_td % 1 != 0:
-        raise ValueError("Need to provide the correct dataset size")
-    """
-    
-    num_exp_td = int(num_exp_td)
-
+    num_exp_td = int(dataset_size / num_datapoints)
 
 
     # Create tokenized dataset ---------------------------------------------------
@@ -161,9 +127,6 @@ def main():
 
     if args.checkpoint == "cardiffnlp/twitter-roberta-base":
         args.checkpoint = "twitter-roberta-base"
-
-
-    
 
     if args.tiny_dataset:
         if args.exp_flag:
@@ -197,7 +160,7 @@ def main():
         train_ids_split = torch.split(train_ids, int(train_ids.shape[0] / args.split_value))
         
         emb = [] 
-        #Create embeddings by splitting train_ids
+        #Create embeddings through smaller train_ids
         for count, train_ids in enumerate(train_ids_split):
             model_outputs = model(train_ids)
             #Embeddings is of dimensions number of tokens x 768 (output layer of BERT)
@@ -205,6 +168,7 @@ def main():
             #0 of last hidden layer is the CLS token
             embeddings = output[:,0,:]
             print(count, embeddings.shape)
+            #Numpy arrays use significantly less space than Tensors
             embeddings = embeddings.cpu().detach().numpy()
             emb.append(embeddings)
             torch.cuda.empty_cache()

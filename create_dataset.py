@@ -31,7 +31,12 @@ def parse_args():
         action="store_true",
         help="Specify whether you want to produce plots regarding the dataset."
     )
-
+    
+    parser.add_argument(
+        '--get-statistics', 
+        action="store_true",
+        help="Specify whether you want to see the label distribution of the dataset."
+    )
     # Directories and filepaths --------------------------------------------------------------
     parser.add_argument(
         '--explanations-filepath', 
@@ -81,22 +86,13 @@ def parse_args():
 
 
 # Helper functions for inspecting data -------------------------------
-def see_datapoints(filepath, label):
-    pd.set_option('display.max_colwidth', None)
-    df = pd.read_csv(filepath, header=0)
-    print(df)
-    deaths = df.loc[df['labels'] == label]['text']
-    print(deaths)
-
-
-
 def inspect_labels(df):
     print(df.groupby('labels').count()) #count of each label
     print(df.groupby('labels').count()/len(df.index)) #percentage of each label
 
 
 
-# Functions to clean tweets - -----------------------------------------------
+# Functions to clean tweets -----------------------------------------------
 def camel_case_split(word):
     start_idx = [i for i, e in enumerate(word) if e.isupper()] + [len(word)]
     start_idx = [0] + start_idx
@@ -108,7 +104,8 @@ def camel_case_split(word):
 #Deals with cases where there are consecutive emojis or no space between text
 #and emoji
 def emoji_present(text):
-    if emoji.is_emoji(text) or (len(text) > 1 and emoji.is_emoji(text[0])) or (len(text) > 1 and emoji.is_emoji(text[-1])):
+    if emoji.is_emoji(text) or (len(text) > 1 and emoji.is_emoji(text[0])) \
+        or (len(text) > 1 and emoji.is_emoji(text[-1])):
         return demoji.replace_with_desc(text, sep="")
     else:
         return text
@@ -225,17 +222,17 @@ def data_fusion(args):
 
     df_total = pd.concat(dataframes)
 
-    # Rename columns 
+    # Rename columns
     df_total.rename(columns={"label": "labels"}, inplace=True)
     df_total.rename(columns={"tweet_text": "text"}, inplace=True)
 
     #Check for duplicate tweets
     df_noexp = check_for_duplicate_tweets(df_total)
     df_noexp.drop_duplicates(subset=['text'], inplace=True)
-    #df_total.drop_duplicates(subset=['text'], inplace=True)
     
     #Get distributions and counts of labels
-    #inspect_labels(df_total)
+    if args.get_statistics:
+        inspect_labels(df_total)
 
     #Sample dataset if provided with percent dataset argument
     if args.percent_dataset != 1.0:
@@ -243,6 +240,7 @@ def data_fusion(args):
         df_noexp = df_noexp.head(int(len(df_noexp)*(args.percent_dataset))) #Get first percent of dataframe
     
     explanations = read_explanations(args.explanations_filepath)
+
     df_exp = create_explanations_dataset(df_noexp, explanations)
     df_noexp.to_csv(args.noexp_csv_filepath, index=False)
     df_exp.to_csv(args.exp_csv_filepath, index=False)
@@ -259,13 +257,14 @@ def main():
 
     data_noexp = load_dataset("csv", data_files=args.noexp_csv_filepath)
     data_exp = load_dataset("csv", data_files=args.exp_csv_filepath)
+
     data_noexp.save_to_disk(args.output_noexp_directory)
     data_exp.save_to_disk(args.output_exp_directory)
-    
-    visualizations_dataset(args.noexp_csv_filepath,
-        args.exp_csv_filepath)
 
-    label_distribution_pie_chart(args.noexp_csv_filepath)
+    if args.get_visualizations:
+        visualizations_dataset(args.noexp_csv_filepath,
+            args.exp_csv_filepath)
+        label_distribution_pie_chart(args.noexp_csv_filepath)
 
 if __name__ == "__main__":
     main()
