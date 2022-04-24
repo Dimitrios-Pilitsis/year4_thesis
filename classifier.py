@@ -116,7 +116,7 @@ def parse_args():
     parser.add_argument(
         "--num-epochs", 
         type=int, 
-        default=10, 
+        default=400, 
         help="Total number of epochs to perform during training."
     )
     
