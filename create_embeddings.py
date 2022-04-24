@@ -62,7 +62,7 @@ def parse_args():
     parser.add_argument(
         "--split-value", 
         type=float, 
-        default=100, 
+        default=150, 
         help="How much to split train_ids before obtaining embeddings."
     )
 
