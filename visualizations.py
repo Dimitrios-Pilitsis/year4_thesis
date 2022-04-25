@@ -148,7 +148,6 @@ def get_preds_and_labels_all_classes(accelerator, model, dataloader):
     #matrix, then repeat the matrix 9 times, once per class
     labels = np.reshape(np.hstack(labels).astype(int), (1,-1))
     labels = np.repeat(labels, 9, axis=0)
-    #predictions_a = np.hstack(predictions)
 
     l = list(range(0,9))
     # Binarize labels to have 9 arrays, 1 for each label

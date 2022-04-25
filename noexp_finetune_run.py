@@ -242,7 +242,7 @@ def main():
 
     # Loading dataset ---------------------------------------------
     raw_datasets = load_from_disk(args.noexp_dataset_filepath)
-    raw_datasets = raw_datasets["train"].train_test_split(train_size=0.8,
+    raw_datasets = raw_datasets["train"].train_test_split(train_size=0.7,
         shuffle=True)
 
 
