@@ -84,6 +84,12 @@ def parse_args():
     )
 
     parser.add_argument(
+        '--weighted-loss', 
+        action='store_true', 
+        help="Run classifier with weighted loss function"
+    )
+
+    parser.add_argument(
         "--percent-dataset", 
         type=float, 
         default=1.0, 
@@ -327,7 +333,6 @@ class Trainer:
                 with torch.no_grad():
                     preds = logits.argmax(-1)
                     train_preds.append(preds.cpu().numpy())
-                    #accuracy = compute_accuracy(labels, preds)
                     accuracy = accuracy_score(labels, preds)
 
                 data_load_time = data_load_end_time - data_load_start_time
@@ -523,7 +528,18 @@ def get_datasets(args):
 
     return train_dataset, test_dataset
 
-
+def get_weights():
+    #Use distribution of labels for weights
+    weights = torch.tensor([13.0864, 2.1791, 3.1197, 7.9103, 14.1146,
+        5.8246, 11.0066, 29.8417, 12.917], dtype=torch.float32)
+    #class size is inversely proportional to weight of class
+    #Convert percentages into correct fractional form e.g. 10% => 0.1
+    weights = weights / weights.sum()
+    #Make weights inversely proportional to class size
+    weights = 1.0/weights    
+    #Scale weights so they sum to 1
+    weights = weights / weights.sum()
+    return weights
 
 # Main --------------------------------------------------
 
@@ -641,7 +657,11 @@ def main():
     optimizer = optim.SGD(model.parameters(), lr=0.005)
 
     # Now we define the loss function.
-    criterion = nn.CrossEntropyLoss() 
+    if args.weighted_loss:
+        weights = get_weights()
+        criterion = nn.CrossEntropyLoss(weight=weights) 
+    else:
+        criterion = nn.CrossEntropyLoss() 
     
 
     trainer = Trainer(
