@@ -339,7 +339,9 @@ class Trainer:
                 with torch.no_grad():
                     preds = logits.argmax(-1)
                     train_preds.append(preds.cpu().numpy())
-                    accuracy = accuracy_score(labels, preds)
+                    accuracy = accuracy_score(
+                        labels.detach().cpu().numpy(), 
+                        preds.detach().cpu().numpy())
 
                 data_load_time = data_load_end_time - data_load_start_time
                 step_time = time.time() - data_load_end_time
@@ -665,7 +667,7 @@ def main():
 
     # Now we define the loss function.
     if args.weighted_loss:
-        weights = get_weights()
+        weights = get_weights().to(device)
         criterion = nn.CrossEntropyLoss(weight=weights) 
     else:
         criterion = nn.CrossEntropyLoss() 
