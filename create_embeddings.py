@@ -7,7 +7,10 @@ import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModel
 
-from datasets import load_from_disk
+from datasets import load_from_disk, DatasetDict
+
+
+
 
 # Argparser -----------------------------------------------------------------
 
@@ -99,6 +102,25 @@ def filepath_keys(text):
 #exit(0)
 
 
+# Tokenizers --------------------------------------------
+def decode_text(tokenizer, text):
+    encoded_input = tokenizer(text)
+    decoded_text = tokenizer.decode(encoded_input["input_ids"])
+    return decoded_text
+
+
+def create_tiny_dataset(raw_datasets, args, num_exp_td):
+    if args.exp_flag:
+        dataset_size_sample = num_exp_td*5 
+        num_datapoints = int(dataset_size_sample / num_exp_td)
+        raw_datasets = raw_datasets.shuffle()['train'][:dataset_size_sample]
+    else:
+        raw_datasets = raw_datasets.shuffle()['train'][:200]
+
+    raw_datasets = DatasetDict({'train' : raw_datasets})
+
+    return raw_datasets
+
 
 # Main -------------------------------------------------------------------
 def main():
@@ -134,18 +156,24 @@ def main():
 
     if args.checkpoint == "cardiffnlp/twitter-roberta-base":
         args.checkpoint = "twitter-roberta-base"
+    
+    def tokenize_noexp_function(examples):
+            return tokenizer(examples["text"], truncation=True, padding=True,
+                return_tensors='pt')
+
+    def tokenize_exp_function(examples):
+        return tokenizer(examples['text'], examples['exp_and_td'],
+            truncation=True, padding=True, return_tensors='pt')
 
     if args.tiny_dataset:
-        if args.exp_flag:
-            dataset_size_sample = num_exp_td*5 
-            num_datapoints = int(dataset_size_sample / num_exp_td)
-            tokenized_train = \
-                tokenizer(raw_datasets['train']['text'][:dataset_size_sample], truncation=True, padding=True, return_tensors='pt')
-        else:
-            tokenized_train = tokenizer(raw_datasets['train']['text'][:100], truncation=True, padding=True, return_tensors='pt')
+        raw_datasets = create_tiny_dataset(raw_datasets, args, num_exp_td)
+
+    if args.exp_flag:
+        tokenized_train = \
+            tokenize_exp_function(raw_datasets['train'])
     else:
-        tokenized_train = tokenizer(raw_datasets['train']['text'], truncation=True, padding=True, return_tensors='pt')
-    
+        tokenized_train = \
+            tokenize_noexp_function(raw_datasets['train'])
 
     torch.backends.cudnn.benchmark = True
     
