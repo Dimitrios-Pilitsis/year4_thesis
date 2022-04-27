@@ -1,4 +1,5 @@
 import argparse
+import time
 
 import pandas as pd
 import numpy as np
@@ -79,6 +80,16 @@ def parse_args():
         default="./dataset/crisis_dataset/exp/", 
         help="Specify location of Exp Apache Arrow directory"
     )
+
+    parser.add_argument(
+        '--timer', 
+        action="store_true",
+        help="Specify whether you want to see the runtime of the program."
+    )
+
+    #Others -----------------------------------------------
+
+
 
     args = parser.parse_args()
 
@@ -248,6 +259,7 @@ def data_fusion(args):
 
 # Main -------------------------------------------------------------
 def main():
+    start_time = time.time()
     args = parse_args()
 
     if not os.path.exists('plots'):
@@ -265,6 +277,10 @@ def main():
         visualizations_dataset(args.noexp_csv_filepath,
             args.exp_csv_filepath)
         label_distribution_pie_chart(args.noexp_csv_filepath)
+    
+    if args.timer:
+        duration = time.time() - start_time
+        print(f'Program took {duration} seconds to run')
 
 if __name__ == "__main__":
     main()

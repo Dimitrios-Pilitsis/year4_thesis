@@ -155,6 +155,12 @@ def parse_args():
         default="bert-base-cased", 
         help="Specify the checkpoint of your model e.g. bert-base-cased."
     )
+    
+    parser.add_argument(
+        '--timer', 
+        action="store_true",
+        help="Specify whether you want to see the runtime of the program."
+    )
 
     # ----------------------------------------------------------
 
@@ -544,6 +550,7 @@ def get_weights():
 # Main --------------------------------------------------
 
 def main():
+    start_time = time.time()
     args = parse_args()
 
     #Alter embeddings filepath for different checkpoints
@@ -674,6 +681,9 @@ def main():
         print_frequency=args.print_frequency,
     )
     
+    if args.timer:
+        duration = time.time() - start_time
+        print(f'Program took {duration} seconds to run')
     
 
 if __name__ == "__main__":

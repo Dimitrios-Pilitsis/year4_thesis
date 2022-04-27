@@ -1,5 +1,6 @@
 import os
 import argparse
+import time
 
 import numpy as np
 
@@ -26,7 +27,12 @@ def parse_args():
         action="store_true",
         help="Use tiny-dataset to confirm program works correctly.",
     )
-
+    
+    parser.add_argument(
+        '--timer', 
+        action="store_true",
+        help="Specify whether you want to see the runtime of the program."
+    )
 
     # Directories -------------------------------------------------------------
     parser.add_argument(
@@ -96,6 +102,7 @@ def filepath_keys(text):
 
 # Main -------------------------------------------------------------------
 def main():
+    start_time = time.time()
     args = parse_args()
     
     explanation_type = get_explanation_type(args.exp_dataset_filepath)
@@ -183,6 +190,11 @@ def main():
         #NoExp ends here
         if args.exp_flag is False:
             torch.save(embeddings, f'./embeddings/noexp_{args.checkpoint}_embeddings.pt')
+
+            if args.timer:
+                duration = time.time() - start_time
+                print(f'Program took {duration} seconds to run')
+
             exit(0)
 
         #Reshape to expect for instance (17117,36*768) i.e. have 1 unique tweet
@@ -194,6 +206,12 @@ def main():
         embeddings_filepath = f'./embeddings/exp_{explanation_type}_{args.checkpoint}'
         torch.save(embeddings,
             f'{embeddings_filepath}_embeddings.pt')
+    
+        if args.timer:
+            duration = time.time() - start_time
+            print(f'Program took {duration} seconds to run')
+
+
 
 
 

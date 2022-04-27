@@ -3,6 +3,7 @@ import random
 import os
 from pathlib import Path
 import argparse
+import time
 import pickle
 
 import numpy as np
@@ -52,6 +53,14 @@ def parse_args():
         action="store_true",
         help="Save the model that you will train.",
     )
+
+    parser.add_argument(
+        '--timer', 
+        action="store_true",
+        help="Specify whether you want to see the runtime of the program."
+    )
+
+
 
     # Directories -------------------------------------------------------------
     parser.add_argument(
@@ -187,6 +196,7 @@ def create_tiny_dataset(tokenized_datasets, seed):
 
 
 def main():
+    start_time = time.time()
     args = parse_args()
 
     # Logger and summary writer --------------------------------------------
@@ -366,6 +376,11 @@ def main():
     if args.save_model:
         model.save_pretrained(output_directory_save_model)
         tokenizer.save_pretrained(output_directory_save_model)
+
+
+    if args.timer:
+        duration = time.time() - start_time
+        print(f'Program took {duration} seconds to run')
 
 
 if __name__ == "__main__":
