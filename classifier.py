@@ -18,6 +18,7 @@ from torch.nn import functional as F
 from typing import Callable
 from torch import optim
 from torch.optim.optimizer import Optimizer
+from torch.optim import AdamW
 
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
@@ -663,7 +664,7 @@ def main():
 
 
     # The optimizer we'll use to update the model parameters
-    optimizer = optim.SGD(model.parameters(), lr=0.005)
+    optimizer = AdamW(model.parameters(), lr=5e-5)
 
     # Now we define the loss function.
     if args.weighted_loss:
