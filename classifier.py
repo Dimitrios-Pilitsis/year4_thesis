@@ -372,6 +372,14 @@ class Trainer:
         self.visualizations_model()
 
 
+
+
+        #TODO: add error analysis functionality
+        print(train_preds)
+        print(train_labels)
+        print(len(train_preds))
+
+
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
         epoch_step = self.step % len(self.train_loader)
         print(
@@ -519,21 +527,57 @@ def get_datasets(args):
         raw_datasets = load_from_disk(args.noexp_dataset_filepath)
         
         #Train includes all datapoints at this point
-        labels = raw_datasets['train']['labels']
+        labels = np.array(raw_datasets['train']['labels'])
 
+        #Shuffle indices
+        idx = np.arange(0, len(embeddings), dtype= np.intc)
+        np.random.shuffle(idx)
+
+        #Shuffle embeddings and labels
+        embeddings = embeddings[idx]
+        labels = labels[idx]
+        
         dataset = Dataset(embeddings, labels)
         
+        #BELOW IS SO THAT WE CAN TEST THE SPLITS WORK
+        #dataset = Dataset(dataset[:199][0], dataset[:199][1])
+        #print(len(dataset))
+        
+
+
         #If the split results in equal values e.g. 70 and 30
         if (args.train_test_split * len(dataset)) % 1 == 0:
             train_size = int(args.train_test_split * len(dataset))
+            print(train_size)
             test_size = len(dataset) - train_size
-            train_dataset, test_dataset = random_split(dataset, [train_size,
-                test_size])
-        else: #unequal split e.g. 25.2 and 10.79
-            train_dataset, test_dataset = random_split(dataset,
-            [int(floor(args.train_test_split *
-                len(dataset))), int(ceil((1-args.train_test_split)*len(dataset)))])
 
+            train_dataset = Dataset(dataset[:train_size][0],
+                dataset[:train_size][1])
+
+            test_dataset = Dataset(dataset[train_size:][0],
+                dataset[train_size:][1])
+
+            #train_dataset, test_dataset = random_split(dataset, [train_size,
+            #    test_size])
+        else: #unequal split e.g. 25.2 and 10.79
+            split_train = int(floor(args.train_test_split *
+                len(dataset)))
+
+            train_dataset = Dataset(dataset[:split_train][0],
+                dataset[:split_train][1])
+
+            test_dataset = Dataset(dataset[split_train:][0],
+                dataset[split_train:][1])
+
+            #train_dataset, test_dataset = random_split(dataset,
+            #[int(floor(args.train_test_split *
+            #    len(dataset))), int(ceil((1-args.train_test_split)*len(dataset)))])
+
+        print(train_dataset)
+        print(len(train_dataset))
+        print(test_dataset)
+        print(len(test_dataset))
+        #exit(0)
 
     return train_dataset, test_dataset
 
@@ -620,6 +664,8 @@ def main():
 
     
     train_dataset, test_dataset = get_datasets(args)
+
+    print(type(train_dataset))
 
     train_loader = DataLoader(
         train_dataset,
