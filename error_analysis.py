@@ -3,7 +3,6 @@ import argparse
 import random
 from collections import Counter
 
-
 from datasets import load_from_disk, load_metric, DatasetDict
 
 
@@ -23,7 +22,6 @@ def parse_args():
         default="error_analysis/gcp/ExpBERT_WCEL/", 
         help="Location of ExpBERT error analysis numpy arrays."
     )
-    
 
     parser.add_argument(
         "--noexp-dataset-filepath", 
@@ -34,6 +32,9 @@ def parse_args():
 
     args = parser.parse_args()
     return args
+
+
+# Helper functions --------------------------------------
 
 def print_lengths(cc, ic, ci, ii):
     print(len(cc))
@@ -55,10 +56,13 @@ def print_counts(cc_labels, ic_labels, ci_labels, ii_labels):
     print(ci_counter)
     print(ii_counter)
 
+
 def print_tweet(dpi, ds):
     #go to the original dataset and find a datapoint of interest
     print(f'TWEET of datapoint {dpi}')
     print(ds['train']['text'][dpi])
+    print(f'Label of datapoint {dpi}')
+    print(ds['train']['labels'][dpi])
 
 
 def analyze_datapoints(classified_datapoints, sample_size, idx_noexp, raw_dataset):
@@ -71,7 +75,7 @@ def analyze_datapoints(classified_datapoints, sample_size, idx_noexp, raw_datase
 
 
 
-
+# Main --------------------------------------------------------------
 
 def main():
     args = parse_args()
@@ -130,7 +134,7 @@ def main():
 
     #Print counts of each class for each category
     print_counts(cc_labels, ic_labels, ci_labels, ii_labels)
-    
+
     #Counts of each category
     #print_lengths(cc, ic, ci, ii)
     
@@ -138,7 +142,7 @@ def main():
     #Analyze random datapoints
     raw_dataset = load_from_disk(args.noexp_dataset_filepath)
 
-    print("\nBoth correctly") 
+    print("\nBoth correct") 
     analyze_datapoints(cc, 3, idx_noexp, raw_dataset)
     
     print("\nNoExp incorrect, ExpBERT correct")
@@ -149,6 +153,8 @@ def main():
 
     print("\nBoth incorrect")
     analyze_datapoints(ii, 3, idx_noexp, raw_dataset)
+
+
 
 
 if __name__ == "__main__":
