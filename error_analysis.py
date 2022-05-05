@@ -1,21 +1,12 @@
 import numpy as np
 import argparse
 
-from datasets import load_from_disk, load_metric, DatasetDict
 
 
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run classifier")
-
-    parser.add_argument(
-        "--datapoint-of-interest", 
-        type=int, 
-        default=0, 
-        help="The datapoint index you want to find out how NoExp and ExpBERT predicted."
-    )
-
     # Filepaths ------------------------------------------
     parser.add_argument(
         "--error-analysis-noexp-filepath", 
@@ -31,24 +22,28 @@ def parse_args():
         help="Location of ExpBERT error analysis numpy arrays."
     )
     
-    parser.add_argument(
-        "--noexp-dataset-filepath", 
-        type=str, 
-        default="./dataset/crisis_dataset/noexp/", 
-        help="Location of Apache Arrow NoExp dataset."
-    )
-
     args = parser.parse_args()
     return args
 
 
+def classifications(preds, labels, idx):
+    correct = 0
+    incorrect = 0
 
-def print_datapoint(dpi, ds):
-    #go to the original dataset and find a datapoint of interest
-    print(f'TWEET of datapoint {dpi}')
-    print(ds['train']['text'][dpi])
-    print(f'Label of datapoint {dpi}')
-    print(ds['train']['labels'][dpi])
+    #Find how many datapoints were correctly and 
+    #incorrectly classified by NoExp
+    for i in range(0, len(idx)):
+        idx_shuffled = np.where(idx==i)[0][0]
+        pred = preds[idx_shuffled]
+        label = labels[idx_shuffled]
+
+        if pred == label:
+            correct += 1
+        else:
+            incorrect += 1
+
+    return correct, incorrect
+
 
 
 def main():
@@ -62,36 +57,58 @@ def main():
     idx_exp = np.load(f'{args.error_analysis_exp_filepath}/idx.npy')
 
 
-
-    #See how many points model got correct
+    #This accuracy metric should not be used for analysis as it combines
+    #the train and test set together
+    print("NoExp accuracy")
+    print(np.sum(preds_noexp == labels_noexp)/17117)
     print(np.sum(preds_noexp == labels_noexp))
     
-    #See how many points model got correct
+    print("ExpBERT accuracy")
+    print(np.sum(preds_exp == labels_exp)/17117)
     print(np.sum(preds_exp == labels_exp))
 
 
-    #TODO: Get actual datapoint using huggingface
+    #The index of the datapoint that we are interested in 
+    #inspecting, before shuffling, in reality this point
+    #is picked randomly, unless you
 
 
-    raw_dataset = load_from_disk(args.noexp_dataset_filepath)
+    cc = 0 #points were correct and remained correct
+    ic = 0 #points were incorrect and became correct
+    ci = 0 #points were correct and became incorrect
+    ii = 0
 
-    #The index of the datapoint,
-    #that we are interested in inspecting, before shuffling
-    #in reality this point is picked randomly, unless you
-    
-    print_datapoint(args.datapoint_of_interest, raw_dataset)
-    exit(0)
+    #Find how many datapoints were correctly and 
+    #incorrectly classified by NoExp
+    for i in range(0, len(idx_noexp)):
+        idx_noexp_shuffled = np.where(idx_noexp==i)[0][0]
+        idx_exp_shuffled = np.where(idx_exp==i)[0][0]
 
+        pred_noexp = preds_noexp[idx_noexp_shuffled]
+        label_noexp = labels_noexp[idx_noexp_shuffled]
 
+        pred_exp = preds_exp[idx_exp_shuffled]
+        label_exp = labels_exp[idx_exp_shuffled]
+        
+        #If was correct and remained correct
+        if (pred_noexp == label_noexp) and \
+            (pred_exp == label_exp): 
+            cc += 1
+        elif (pred_noexp != label_noexp) and \
+            (pred_exp == label_exp):
+            ic += 1
+        elif (pred_noexp == label_noexp) and \
+            (pred_exp != label_exp):
+            ci += 1
+        else:
+            ii += 1
 
-    #TODO: Check if ExpBERT improved a datapoint
+    print(cc)
+    print(ic)
+    print(ci)
+    print(ii)
+    print(cc+ic+ci+ii)
 
-    
-    idx_datapoint = np.where(idx==args.datapoint_of_interest)
-    print(idx_datapoint)
-
-    #Issue is that we don't know if its in train or test set, need to note it
-    #print(train_dataset[idx_datapoint])
 
 
 
