@@ -7,6 +7,7 @@ from typing import Union, NamedTuple
 import pickle
 from pathlib import Path
 import os
+import copy
 
 import numpy as np
 
@@ -76,7 +77,7 @@ def parse_args():
         default="metrics", 
         help="Where to store the metrics of the model during training and testing."
     )
-    
+
     #Flags and model variables -----------------------------
     parser.add_argument(
         '--exp-flag', 
@@ -355,13 +356,17 @@ class Trainer:
             #Arrange them to have correct shape 
             train_preds = np.concatenate(train_preds).ravel()
             train_labels = np.concatenate(train_labels).ravel()
+
+
             train_results_epoch = get_metrics(train_labels, train_preds)
             train_metrics_total.append(train_results_epoch)
             print(train_results_epoch)
 
-            test_results_epoch = self.validate() #Run validation set
+            test_results_epoch, test_preds_labels = self.validate() #Run validation set
             test_metrics_total.append(test_results_epoch)
             self.model.train() #Need to put model back into train mode
+
+
         
         #Save metrics 
         with open(self.metrics_filepath+'/train.p', 'wb') as fp:
@@ -372,12 +377,18 @@ class Trainer:
         self.visualizations_model()
 
 
+        #Save predictions and labels of last epoch for error analysis
+        test_preds = np.array(test_preds_labels["preds"])
+        test_labels = np.array(test_preds_labels["labels"])
+
+        preds = np.concatenate([train_preds, test_preds])
+        labels = np.concatenate([train_labels, test_labels])
+
+        np.save('error_analysis/preds.npy', preds) 
+        np.save('error_analysis/labels.npy', labels) 
 
 
-        #TODO: add error analysis functionality
-        print(train_preds)
-        print(train_labels)
-        print(len(train_preds))
+
 
 
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
@@ -410,6 +421,8 @@ class Trainer:
                 results["preds"].extend(list(preds))
                 results["labels"].extend(list(labels.cpu().numpy()))
 
+        preds_labels = copy.deepcopy(results)
+
         results = get_metrics(results["labels"], results["preds"])
 
         average_loss = total_loss / len(self.val_loader)
@@ -417,7 +430,7 @@ class Trainer:
         print(f"validation loss: {average_loss:.5f}")
         print(results)
 
-        return results
+        return results, preds_labels
     
     #Visualizations of model
     def visualizations_model(self):
@@ -528,7 +541,7 @@ def get_datasets(args):
         
         #Train includes all datapoints at this point
         labels = np.array(raw_datasets['train']['labels'])
-
+        
         #Shuffle indices
         idx = np.arange(0, len(embeddings), dtype= np.intc)
         np.random.shuffle(idx)
@@ -536,19 +549,17 @@ def get_datasets(args):
         #Shuffle embeddings and labels
         embeddings = embeddings[idx]
         labels = labels[idx]
-        
+
         dataset = Dataset(embeddings, labels)
+
         
         #BELOW IS SO THAT WE CAN TEST THE SPLITS WORK
         #dataset = Dataset(dataset[:199][0], dataset[:199][1])
         #print(len(dataset))
         
-
-
         #If the split results in equal values e.g. 70 and 30
         if (args.train_test_split * len(dataset)) % 1 == 0:
             train_size = int(args.train_test_split * len(dataset))
-            print(train_size)
             test_size = len(dataset) - train_size
 
             train_dataset = Dataset(dataset[:train_size][0],
@@ -579,7 +590,7 @@ def get_datasets(args):
         print(len(test_dataset))
         #exit(0)
 
-    return train_dataset, test_dataset
+    return train_dataset, test_dataset, idx
 
 def get_weights():
     #Use distribution of labels for weights
@@ -640,8 +651,8 @@ def main():
             args.checkpoint, args.num_epochs, args.percent_dataset,
             explanation_type, args.num_hidden_layers)
 
-    if not os.path.exists('metrics'):
-        os.makedirs('metrics')
+    if not os.path.exists('error_analysis'):
+        os.makedirs('error_analysis')
 
 
     #current run is the name used for all visualizations for a specific run
@@ -663,13 +674,14 @@ def main():
 
 
     
-    train_dataset, test_dataset = get_datasets(args)
+    train_dataset, test_dataset, idx = get_datasets(args)
 
-    print(type(train_dataset))
+    np.save('error_analysis/idx.npy', idx)
 
+    #We do not shuffle as we already performed shuffling
     train_loader = DataLoader(
         train_dataset,
-        shuffle=True,
+        shuffle=False,
         batch_size=args.batch_size,
         num_workers=args.worker_count,
         pin_memory=True,
@@ -677,7 +689,7 @@ def main():
 
     test_loader = DataLoader(
         test_dataset,
-        shuffle=True,
+        shuffle=False,
         batch_size=args.batch_size,
         num_workers=args.worker_count,
         pin_memory=True,
