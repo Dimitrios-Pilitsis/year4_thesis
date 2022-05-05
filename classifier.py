@@ -384,8 +384,8 @@ class Trainer:
         preds = np.concatenate([train_preds, test_preds])
         labels = np.concatenate([train_labels, test_labels])
 
-        np.save('error_analysis/preds.npy', preds) 
-        np.save('error_analysis/labels.npy', labels) 
+        np.save(f'error_analysis/{self.current_run}/preds.npy', preds) 
+        np.save(f'error_analysis/{self.current_run}/labels.npy', labels) 
 
 
 
@@ -651,8 +651,7 @@ def main():
             args.checkpoint, args.num_epochs, args.percent_dataset,
             explanation_type, args.num_hidden_layers)
 
-    if not os.path.exists('error_analysis'):
-        os.makedirs('error_analysis')
+    
 
 
     #current run is the name used for all visualizations for a specific run
@@ -662,7 +661,13 @@ def main():
     logs_filepath = args.output_logs + "/" + current_run + "/"
     metrics_filepath = "./metrics/" + current_run + "/"
     plots_filepath = "./plots/" + current_run + "/"
-   
+    
+    if not os.path.exists(f'error_analysis/{current_run}'):
+        #os.makedirs('error_analysis')
+        os.makedirs(f'error_analysis/{current_run}')
+
+
+
     if not os.path.exists(logs_filepath):
         os.makedirs(logs_filepath)
 
@@ -676,7 +681,7 @@ def main():
     
     train_dataset, test_dataset, idx = get_datasets(args)
 
-    np.save('error_analysis/idx.npy', idx)
+    np.save(f'error_analysis/{current_run}/idx.npy', idx)
 
     #We do not shuffle as we already performed shuffling
     train_loader = DataLoader(
@@ -731,7 +736,6 @@ def main():
     else:
         criterion = nn.CrossEntropyLoss() 
     
-
     trainer = Trainer(
         model, train_loader, test_loader, criterion, 
             optimizer, device, metrics_filepath, current_run
