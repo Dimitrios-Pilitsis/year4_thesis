@@ -1,8 +1,8 @@
 import numpy as np
 import argparse
+import random
 
-
-
+from datasets import load_from_disk, load_metric, DatasetDict
 
 
 def parse_args():
@@ -22,27 +22,40 @@ def parse_args():
         help="Location of ExpBERT error analysis numpy arrays."
     )
     
+
+    parser.add_argument(
+        "--noexp-dataset-filepath", 
+        type=str, 
+        default="./dataset/crisis_dataset/noexp/", 
+        help="Location of Apache Arrow NoExp dataset."
+    )
+
     args = parser.parse_args()
     return args
 
+def print_lengths(cc, ic, ci, ii):
+    print(len(cc))
+    print(len(ic))
+    print(len(ci))
+    print(len(ii))
+    #Total lengths should be 17117
+    print(len(cc)+len(ic)+len(ci)+len(ii))
 
-def classifications(preds, labels, idx):
-    correct = 0
-    incorrect = 0
+def print_tweet(dpi, ds):
+    #go to the original dataset and find a datapoint of interest
+    print(f'TWEET of datapoint {dpi}')
+    print(ds['train']['text'][dpi])
 
-    #Find how many datapoints were correctly and 
-    #incorrectly classified by NoExp
-    for i in range(0, len(idx)):
-        idx_shuffled = np.where(idx==i)[0][0]
-        pred = preds[idx_shuffled]
-        label = labels[idx_shuffled]
 
-        if pred == label:
-            correct += 1
-        else:
-            incorrect += 1
+def analyze_datapoints(classified_datapoints, sample_size, idx_noexp, raw_dataset):
+    sample = random.sample(classified_datapoints, sample_size)
+    for pair in sample:
+        noexp = pair[0]
+        #NoExp and ExpBERT have same tweet index
+        tweet_index = idx_noexp[noexp]
+        print_tweet(noexp, raw_dataset)
 
-    return correct, incorrect
+
 
 
 
@@ -57,26 +70,15 @@ def main():
     idx_exp = np.load(f'{args.error_analysis_exp_filepath}/idx.npy')
 
 
-    #This accuracy metric should not be used for analysis as it combines
-    #the train and test set together
-    print("NoExp accuracy")
-    print(np.sum(preds_noexp == labels_noexp)/17117)
-    print(np.sum(preds_noexp == labels_noexp))
-    
-    print("ExpBERT accuracy")
-    print(np.sum(preds_exp == labels_exp)/17117)
-    print(np.sum(preds_exp == labels_exp))
-
-
     #The index of the datapoint that we are interested in 
     #inspecting, before shuffling, in reality this point
     #is picked randomly, unless you
 
-
-    cc = 0 #points were correct and remained correct
-    ic = 0 #points were incorrect and became correct
-    ci = 0 #points were correct and became incorrect
-    ii = 0
+    #List of tuples (index of NoExp, index of ExpBERT)
+    cc = [] #points were correct and remained correct
+    ic = [] #points were incorrect and became correct
+    ci = [] #points were correct and became incorrect
+    ii = []
 
     #Find how many datapoints were correctly and 
     #incorrectly classified by NoExp
@@ -93,23 +95,35 @@ def main():
         #If was correct and remained correct
         if (pred_noexp == label_noexp) and \
             (pred_exp == label_exp): 
-            cc += 1
+            cc.append((idx_noexp_shuffled,idx_exp_shuffled))
         elif (pred_noexp != label_noexp) and \
             (pred_exp == label_exp):
-            ic += 1
+            ic.append((idx_noexp_shuffled,idx_exp_shuffled))
         elif (pred_noexp == label_noexp) and \
             (pred_exp != label_exp):
-            ci += 1
+            ci.append((idx_noexp_shuffled,idx_exp_shuffled))
         else:
-            ii += 1
+            ii.append((idx_noexp_shuffled,idx_exp_shuffled))
+    
+    #Counts of each category
 
-    print(cc)
-    print(ic)
-    print(ci)
-    print(ii)
-    print(cc+ic+ci+ii)
+    #print_lengths(cc, ic, ci, ii)
+    
+    
+    #Analyze random datapoints
+    raw_dataset = load_from_disk(args.noexp_dataset_filepath)
 
+    print("\nBoth correctly") 
+    analyze_datapoints(cc, 3, idx_noexp, raw_dataset)
+    
+    print("\nNoExp incorrect, ExpBERT correct")
+    analyze_datapoints(ic, 3, idx_noexp, raw_dataset)
 
+    print("\nNoExp correct, ExpBERT incorrect")
+    analyze_datapoints(ci, 3, idx_noexp, raw_dataset)
+
+    print("\nBoth incorrect")
+    analyze_datapoints(ii, 3, idx_noexp, raw_dataset)
 
 
 if __name__ == "__main__":
