@@ -19,7 +19,7 @@ from torch.nn import functional as F
 from typing import Callable
 from torch import optim
 from torch.optim.optimizer import Optimizer
-from torch.optim import AdamW
+from torch.optim import AdamW, SGD
 
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
@@ -103,6 +103,12 @@ def parse_args():
         type=float, 
         default=0.7, 
         help="Percentage of splitting train and test sets."
+    )
+
+    parser.add_argument(
+        '--adamw', 
+        action='store_true', 
+        help="Train model using Adam with weight decay"
     )
 
 
@@ -727,7 +733,10 @@ def main():
 
 
     # The optimizer we'll use to update the model parameters
-    optimizer = AdamW(model.parameters(), lr=5e-5)
+    if args.adamw:
+        optimizer = AdamW(model.parameters(), lr=5e-5)
+    else:
+        optimizer = SGD(model.parameters(), lr=0.005)
 
     # Now we define the loss function.
     if args.weighted_loss:
